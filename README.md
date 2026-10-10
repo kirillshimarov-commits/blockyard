@@ -64,7 +64,7 @@ pnpm tauri build    # установщик в src-tauri/target/release/bundle/
 
 ## Релизы
 
-Установщик для релиза собирается при пуше тега: `git tag v0.2.0 && git push origin v0.2.0` — он появится на странице **Releases**.
+GitHub → **Actions** → **Build** → **Run workflow** → в поле версии введите, например, `v0.3.0` → **Run workflow**. Через ~10 минут установщик появится на странице **Releases** (также работает пуш тега `v*`).
 
 ## Структура
 
