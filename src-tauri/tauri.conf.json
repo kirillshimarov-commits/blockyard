@@ -16,11 +16,13 @@
         "width": 1180,
         "height": 740,
         "minWidth": 900,
-        "minHeight": 600
+        "minHeight": 600,
+        "transparent": true,
+        "visible": false
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' https://cdn.modrinth.com https://media.forgecdn.net data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; img-src 'self' https://cdn.modrinth.com https://media.forgecdn.net data: blob:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
     }
   },
   "bundle": {

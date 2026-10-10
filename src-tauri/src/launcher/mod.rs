@@ -1,5 +1,6 @@
 //! Launcher core: everything that does not depend on Tauri.
 
+pub mod appearance;
 pub mod curseforge;
 pub mod fabric;
 pub mod http;

@@ -2,12 +2,14 @@ mod launcher;
 
 use crate::launcher::instance::{self, Instance, Loader};
 use crate::launcher::settings::{self, Settings};
+use crate::launcher::appearance;
 use crate::launcher::mods::{self, Source};
 use crate::launcher::{curseforge, fabric, launch, modrinth, mojang, Progress, Reporter};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::window::{Effect, EffectsBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, Theme, WebviewWindow};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::Notify;
 
@@ -241,11 +243,73 @@ fn remove_mod(instance_id: String, project_id: String) -> CmdResult<Instance> {
     instance::remove_mod(&instance_id, &project_id).map_err(err)
 }
 
+// ---------- Appearance ----------
+
+#[tauri::command]
+fn get_appearance() -> serde_json::Value {
+    appearance::load()
+}
+
+#[tauri::command]
+fn save_appearance(value: serde_json::Value) -> CmdResult<()> {
+    appearance::save(&value).map_err(err)
+}
+
+/// Applies the translucency effect and returns the one actually in use
+/// ("mica" | "acrylic" | "blur" | "none"), so the UI can switch to an opaque background.
+fn apply_window_style(window: &WebviewWindow, effect: &str, theme: &str) -> &'static str {
+    let _ = window.set_theme(match theme {
+        "dark" => Some(Theme::Dark),
+        "light" => Some(Theme::Light),
+        _ => None,
+    });
+
+    let wanted = match effect {
+        "auto" if appearance::is_windows_11() => "mica",
+        "auto" => "acrylic",
+        "mica" if !appearance::is_windows_11() => "acrylic",
+        other => other,
+    };
+    let (name, effect) = match wanted {
+        "mica" => ("mica", Effect::Mica),
+        "acrylic" => ("acrylic", Effect::Acrylic),
+        "blur" => ("blur", Effect::Blur),
+        _ => {
+            let _ = window.set_effects(None);
+            return "none";
+        }
+    };
+    if cfg!(target_os = "windows") && window.set_effects(EffectsBuilder::new().effect(effect).build()).is_ok() {
+        name
+    } else {
+        let _ = window.set_effects(None);
+        "none"
+    }
+}
+
+#[tauri::command]
+fn set_window_style(window: WebviewWindow, effect: String, theme: String) -> &'static str {
+    apply_window_style(&window, &effect, &theme)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(Running::default())
+        .setup(|app| {
+            // The window starts hidden so the saved effect is in place before it appears.
+            if let Some(window) = app.get_webview_window("main") {
+                let saved = appearance::load();
+                apply_window_style(
+                    &window,
+                    appearance::field(&saved, "effect", "auto"),
+                    appearance::field(&saved, "theme", "system"),
+                );
+                window.show()?;
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
@@ -264,6 +328,9 @@ pub fn run() {
             search_mods,
             install_mod,
             import_pending_mods,
+            get_appearance,
+            save_appearance,
+            set_window_style,
             remove_mod,
         ])
         .run(tauri::generate_context!())

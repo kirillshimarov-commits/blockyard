@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
 import Library from "./pages/Library";
@@ -6,6 +6,14 @@ import InstanceView from "./pages/InstanceView";
 import Browse from "./pages/Browse";
 import SettingsPage from "./pages/Settings";
 import { Icon } from "./components/Icon";
+import {
+  Appearance,
+  applyAppearance,
+  applyWindowStyle,
+  DEFAULT_APPEARANCE,
+  loadAppearance,
+  saveAppearance,
+} from "./appearance";
 
 export type View =
   | { kind: "library" }
@@ -28,6 +36,39 @@ export default function App() {
   const [status, setStatus] = useState<Record<string, GameStatus>>({});
   const [logs, setLogs] = useState<Record<string, string[]>>({});
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
+  const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
+  const [activeEffect, setActiveEffect] = useState("none");
+  const saveTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    loadAppearance().then(async (a) => {
+      setAppearance(a);
+      setActiveEffect(await applyWindowStyle(a));
+    });
+  }, []);
+
+  useEffect(() => {
+    applyAppearance(appearance, activeEffect);
+    if (appearance.theme !== "system") return;
+    // Follow the OS when it switches between light and dark.
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const onChange = () => applyAppearance(appearance, activeEffect);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [appearance, activeEffect]);
+
+  const appearanceRef = useRef(appearance);
+  appearanceRef.current = appearance;
+
+  const changeAppearance = useCallback((next: Appearance) => {
+    const prev = appearanceRef.current;
+    if (prev.effect !== next.effect || prev.theme !== next.theme) {
+      applyWindowStyle(next).then(setActiveEffect);
+    }
+    setAppearance(next);
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => saveAppearance(next).catch(() => {}), 400);
+  }, []);
 
   const notify = useCallback((text: string, error = false) => {
     setToast({ text, error });
@@ -96,6 +137,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="app-bg" />
       <aside className="sidebar">
         <div className="brand">
           <img src="/logo.svg" alt="" />
@@ -109,7 +151,7 @@ export default function App() {
               onClick={() => setView({ kind: item.kind } as View)}
             >
               <Icon name={item.icon} />
-              {item.label}
+              <span className="nav-label">{item.label}</span>
             </button>
           ))}
         </nav>
@@ -178,7 +220,14 @@ export default function App() {
           />
         )}
         {view.kind === "settings" && settings && (
-          <SettingsPage settings={settings} onSaved={setSettings} notify={notify} />
+          <SettingsPage
+            settings={settings}
+            onSaved={setSettings}
+            appearance={appearance}
+            activeEffect={activeEffect}
+            onAppearanceChange={changeAppearance}
+            notify={notify}
+          />
         )}
       </main>
 
