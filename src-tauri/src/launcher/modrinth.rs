@@ -1,15 +1,16 @@
 //! Modrinth API v2: search and install mods with their required dependencies.
 
 use super::http::{self, Download};
-use super::instance::{self, InstalledMod, Instance};
+use super::instance::{self, InstalledMod};
+use super::mods::{self, InstallResult, ModHit, SearchResult, Source};
 use anyhow::{anyhow, bail, Result};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashSet;
 
 const API_URL: &str = "https://api.modrinth.com/v2";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchHit {
+#[derive(Debug, Clone, Deserialize)]
+struct SearchHit {
     pub project_id: String,
     pub slug: String,
     pub title: String,
@@ -22,11 +23,10 @@ pub struct SearchHit {
     pub categories: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
-    pub hits: Vec<SearchHit>,
-    pub total_hits: u64,
-    pub offset: u64,
+#[derive(Debug, Clone, Deserialize)]
+struct SearchResponse {
+    hits: Vec<SearchHit>,
+    total_hits: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -97,7 +97,25 @@ pub async fn search(
         enc(query),
         enc(&serde_json::to_string(&facets)?),
     );
-    http::get_json(&url).await
+    let resp: SearchResponse = http::get_json(&url).await?;
+    Ok(SearchResult {
+        total_hits: resp.total_hits,
+        hits: resp
+            .hits
+            .into_iter()
+            .map(|h| ModHit {
+                source: Source::Modrinth,
+                page_url: format!("https://modrinth.com/mod/{}", h.slug),
+                project_id: h.project_id,
+                title: h.title,
+                description: h.description,
+                author: h.author,
+                icon_url: h.icon_url,
+                downloads: h.downloads,
+                categories: h.categories,
+            })
+            .collect(),
+    })
 }
 
 async fn latest_compatible(project_id: &str, game_version: &str, loader: &str) -> Result<Option<Version>> {
@@ -113,17 +131,16 @@ async fn latest_compatible(project_id: &str, game_version: &str, loader: &str) -
 }
 
 /// Installs a mod and its required dependencies into the instance.
-/// Returns the updated instance and the titles of newly installed mods.
-pub async fn install(instance_id: &str, project_id: &str) -> Result<(Instance, Vec<String>)> {
+pub async fn install(instance_id: &str, project_id: &str) -> Result<InstallResult> {
     let mut inst = instance::get(instance_id)?;
     let loader = inst
         .loader
-        .modrinth_name()
+        .mod_loader()
         .ok_or_else(|| anyhow!("Моды можно ставить только в сборку с Fabric"))?;
     let game_version = inst.game_version.clone();
 
     let mut installed_titles = Vec::new();
-    let mut visited: HashSet<String> = inst.mods.iter().map(|m| m.project_id.clone()).collect();
+    let mut visited: HashSet<String> = HashSet::new();
     // (project id, exact version id if a dependency pins one)
     let mut queue: Vec<(Option<String>, Option<String>)> = vec![(Some(project_id.to_string()), None)];
     let mut root = true;
@@ -144,6 +161,10 @@ pub async fn install(instance_id: &str, project_id: &str) -> Result<(Instance, V
         if !visited.insert(version.project_id.clone()) {
             continue;
         }
+        let project: Project = http::get_json(&format!("{API_URL}/project/{}", enc(&version.project_id))).await?;
+        if mods::already_installed(&inst, Source::Modrinth, &project.id, &project.title) {
+            continue;
+        }
 
         let file = version
             .files
@@ -151,9 +172,7 @@ pub async fn install(instance_id: &str, project_id: &str) -> Result<(Instance, V
             .find(|f| f.primary)
             .or_else(|| version.files.first())
             .ok_or_else(|| anyhow!("у версии мода нет файлов"))?;
-        if file.filename.contains(['/', '\\']) || file.filename.starts_with('.') {
-            bail!("недопустимое имя файла мода");
-        }
+        mods::check_file_name(&file.filename)?;
         http::download(&Download {
             url: file.url.clone(),
             path: inst.mods_dir().join(&file.filename),
@@ -161,9 +180,9 @@ pub async fn install(instance_id: &str, project_id: &str) -> Result<(Instance, V
         })
         .await?;
 
-        let project: Project = http::get_json(&format!("{API_URL}/project/{}", enc(&version.project_id))).await?;
         installed_titles.push(project.title.clone());
         inst.mods.push(InstalledMod {
+            source: Source::Modrinth,
             project_id: project.id,
             version_id: version.id.clone(),
             title: project.title,
@@ -179,5 +198,5 @@ pub async fn install(instance_id: &str, project_id: &str) -> Result<(Instance, V
             queue.push((dep.project_id.clone(), dep.version_id.clone()));
         }
     }
-    Ok((inst, installed_titles))
+    Ok(InstallResult { instance: inst, installed: installed_titles, pending: Vec::new() })
 }

@@ -1,5 +1,6 @@
 //! Instances: separate game folders, each with its own version, loader and mods.
 
+use super::mods::{PendingDownload, Source};
 use super::{now, paths};
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
@@ -13,8 +14,8 @@ pub enum Loader {
 }
 
 impl Loader {
-    /// Name Modrinth uses for this loader, if mods are supported.
-    pub fn modrinth_name(&self) -> Option<&'static str> {
+    /// Loader name used by mod sites, if mods are supported.
+    pub fn mod_loader(&self) -> Option<&'static str> {
         match self {
             Loader::Vanilla => None,
             Loader::Fabric { .. } => Some("fabric"),
@@ -25,6 +26,8 @@ impl Loader {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledMod {
+    #[serde(default)]
+    pub source: Source,
     pub project_id: String,
     pub version_id: String,
     pub title: String,
@@ -46,6 +49,9 @@ pub struct Instance {
     pub last_played: Option<u64>,
     #[serde(default)]
     pub mods: Vec<InstalledMod>,
+    /// Mods waiting for the user to download them in the browser.
+    #[serde(default)]
+    pub pending: Vec<PendingDownload>,
 }
 
 impl Instance {
@@ -113,6 +119,7 @@ pub fn create(name: &str, game_version: &str, loader: Loader, memory_mb: u32) ->
         created_at: now(),
         last_played: None,
         mods: Vec::new(),
+        pending: Vec::new(),
     };
     instance.save()?;
     Ok(instance)
@@ -132,7 +139,8 @@ pub fn remove_mod(id: &str, project_id: &str) -> Result<Instance> {
     if let Some(pos) = instance.mods.iter().position(|m| m.project_id == project_id) {
         let removed = instance.mods.remove(pos);
         let _ = std::fs::remove_file(instance.mods_dir().join(&removed.file_name));
-        instance.save()?;
     }
+    instance.pending.retain(|p| p.project_id != project_id);
+    instance.save()?;
     Ok(instance)
 }

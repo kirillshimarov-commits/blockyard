@@ -2,7 +2,8 @@ mod launcher;
 
 use crate::launcher::instance::{self, Instance, Loader};
 use crate::launcher::settings::{self, Settings};
-use crate::launcher::{fabric, launch, modrinth, mojang, Progress, Reporter};
+use crate::launcher::mods::{self, Source};
+use crate::launcher::{curseforge, fabric, launch, modrinth, mojang, Progress, Reporter};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -199,29 +200,40 @@ fn stop_instance(id: String, running: State<'_, Running>) {
 // ---------- Mods ----------
 
 #[tauri::command]
+fn curseforge_available() -> bool {
+    curseforge::is_available()
+}
+
+#[tauri::command]
 async fn search_mods(
+    source: Source,
     query: String,
     game_version: Option<String>,
     loader: Option<String>,
     sort: String,
     offset: u64,
-) -> CmdResult<modrinth::SearchResult> {
-    modrinth::search(&query, game_version.as_deref(), loader.as_deref(), &sort, offset)
-        .await
-        .map_err(err)
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct InstallResult {
-    instance: Instance,
-    installed: Vec<String>,
+) -> CmdResult<mods::SearchResult> {
+    let (q, v, l) = (&query, game_version.as_deref(), loader.as_deref());
+    match source {
+        Source::Modrinth => modrinth::search(q, v, l, &sort, offset).await,
+        Source::Curseforge => curseforge::search(q, v, l, &sort, offset).await,
+    }
+    .map_err(err)
 }
 
 #[tauri::command]
-async fn install_mod(instance_id: String, project_id: String) -> CmdResult<InstallResult> {
-    let (instance, installed) = modrinth::install(&instance_id, &project_id).await.map_err(err)?;
-    Ok(InstallResult { instance, installed })
+async fn install_mod(instance_id: String, source: Source, project_id: String) -> CmdResult<mods::InstallResult> {
+    match source {
+        Source::Modrinth => modrinth::install(&instance_id, &project_id).await,
+        Source::Curseforge => curseforge::install(&instance_id, &project_id).await,
+    }
+    .map_err(err)
+}
+
+/// Picks up mods the user downloaded manually from the Downloads folder.
+#[tauri::command]
+fn import_pending_mods(instance_id: String) -> CmdResult<Instance> {
+    mods::import_pending(&instance_id).map_err(err)
 }
 
 #[tauri::command]
@@ -248,8 +260,10 @@ pub fn run() {
             running_instances,
             launch_instance,
             stop_instance,
+            curseforge_available,
             search_mods,
             install_mod,
+            import_pending_mods,
             remove_mod,
         ])
         .run(tauri::generate_context!())

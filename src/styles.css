@@ -715,3 +715,39 @@ input[type="range"] {
 .toast.error {
   border-left-color: var(--danger);
 }
+
+/* ---------- Sources ---------- */
+
+.source-tabs {
+  max-width: 320px;
+}
+.segmented button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.source-badge {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.source-badge.modrinth {
+  background: rgba(47, 209, 126, 0.15);
+  color: var(--accent);
+}
+.source-badge.curseforge {
+  background: rgba(241, 100, 54, 0.15);
+  color: #f58a62;
+}
+.warning-box {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(242, 184, 75, 0.4);
+  background: rgba(242, 184, 75, 0.08);
+  color: #f5d08b;
+}
+.pending-list {
+  margin: 16px 0 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}

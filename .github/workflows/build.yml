@@ -9,6 +9,9 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      # Embedded into the app at compile time; CurseForge is disabled when the secret is missing.
+      CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 

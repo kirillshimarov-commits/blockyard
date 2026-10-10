@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type Loader = { type: "vanilla" } | { type: "fabric"; version: string };
 
+export type Source = "modrinth" | "curseforge";
+
 export interface InstalledMod {
+  source: Source;
   projectId: string;
   versionId: string;
   title: string;
@@ -19,6 +22,16 @@ export interface Instance {
   createdAt: number;
   lastPlayed?: number | null;
   mods: InstalledMod[];
+  pending: PendingDownload[];
+}
+
+export interface PendingDownload {
+  source: Source;
+  projectId: string;
+  title: string;
+  fileName: string;
+  pageUrl: string;
+  iconUrl?: string | null;
 }
 
 export interface Settings {
@@ -38,20 +51,26 @@ export interface FabricLoader {
 }
 
 export interface ModHit {
-  project_id: string;
-  slug: string;
+  source: Source;
+  projectId: string;
   title: string;
   description: string;
   author: string;
-  icon_url?: string | null;
+  iconUrl?: string | null;
   downloads: number;
   categories: string[];
+  pageUrl: string;
 }
 
 export interface SearchResult {
   hits: ModHit[];
-  total_hits: number;
-  offset: number;
+  totalHits: number;
+}
+
+export interface InstallResult {
+  instance: Instance;
+  installed: string[];
+  pending: PendingDownload[];
 }
 
 export type GameState = "installing" | "running" | "stopped";
@@ -89,10 +108,18 @@ export const api = {
   runningInstances: () => invoke<string[]>("running_instances"),
   launch: (id: string) => invoke<void>("launch_instance", { id }),
   stop: (id: string) => invoke<void>("stop_instance", { id }),
-  searchMods: (query: string, gameVersion: string | null, loader: string | null, sort: string, offset: number) =>
-    invoke<SearchResult>("search_mods", { query, gameVersion, loader, sort, offset }),
-  installMod: (instanceId: string, projectId: string) =>
-    invoke<{ instance: Instance; installed: string[] }>("install_mod", { instanceId, projectId }),
+  curseforgeAvailable: () => invoke<boolean>("curseforge_available"),
+  searchMods: (
+    source: Source,
+    query: string,
+    gameVersion: string | null,
+    loader: string | null,
+    sort: string,
+    offset: number,
+  ) => invoke<SearchResult>("search_mods", { source, query, gameVersion, loader, sort, offset }),
+  installMod: (instanceId: string, source: Source, projectId: string) =>
+    invoke<InstallResult>("install_mod", { instanceId, source, projectId }),
+  importPendingMods: (instanceId: string) => invoke<Instance>("import_pending_mods", { instanceId }),
   removeMod: (instanceId: string, projectId: string) => invoke<Instance>("remove_mod", { instanceId, projectId }),
 };
 

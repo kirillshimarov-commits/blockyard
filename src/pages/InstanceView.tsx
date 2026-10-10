@@ -3,6 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { api, errorText, Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
+import PendingDownloadsModal from "../components/PendingDownloadsModal";
 
 interface Props {
   instance?: Instance;
@@ -21,6 +22,7 @@ type Tab = "mods" | "log" | "options";
 export default function InstanceView(props: Props) {
   const { instance, status, logs, onPlay, onStop, onBrowse, onChanged, onDeleted, notify } = props;
   const [tab, setTab] = useState<Tab>("mods");
+  const [showPending, setShowPending] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
   const state = status?.state ?? "stopped";
@@ -125,6 +127,14 @@ export default function InstanceView(props: Props) {
           </div>
         ) : (
           <>
+            {instance.pending.length > 0 && (
+              <div className="warning-box row between">
+                <span>Ждут ручного скачивания: {instance.pending.map((p) => p.title).join(", ")}</span>
+                <button className="btn" onClick={() => setShowPending(true)}>
+                  Скачать
+                </button>
+              </div>
+            )}
             <div className="row between">
               <span className="muted">{instance.mods.length ? "Установленные моды" : "Модов пока нет"}</span>
               <button className="btn primary" onClick={onBrowse}>
@@ -137,7 +147,12 @@ export default function InstanceView(props: Props) {
                   {m.iconUrl ? <img src={m.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
                   <div className="grow">
                     <div className="mod-title">{m.title}</div>
-                    <div className="muted small">{m.fileName}</div>
+                    <div className="muted small">
+                      <span className={`source-badge ${m.source}`}>
+                        {m.source === "curseforge" ? "CurseForge" : "Modrinth"}
+                      </span>{" "}
+                      {m.fileName}
+                    </div>
                   </div>
                   <button
                     className="btn icon"
@@ -152,6 +167,10 @@ export default function InstanceView(props: Props) {
             </div>
           </>
         ))}
+
+      {showPending && (
+        <PendingDownloadsModal instance={instance} onChanged={onChanged} onClose={() => setShowPending(false)} />
+      )}
 
       {tab === "log" && (
         <pre className="log" ref={logRef}>
