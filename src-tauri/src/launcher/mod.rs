@@ -1,6 +1,7 @@
 //! Launcher core: everything that does not depend on Tauri.
 
 pub mod appearance;
+pub mod auth;
 pub mod crash;
 pub mod curseforge;
 pub mod fabric;
@@ -13,6 +14,7 @@ pub mod modrinth;
 pub mod modpack;
 pub mod mods;
 pub mod mojang;
+pub mod updates;
 pub mod paths;
 pub mod settings;
 

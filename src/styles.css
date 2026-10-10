@@ -968,3 +968,59 @@ input[type="range"]::-webkit-slider-thumb {
 .crash-box .btn {
   flex-shrink: 0;
 }
+
+.update-row {
+  cursor: pointer;
+}
+.update-row input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------- Accounts ---------- */
+
+.accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.account-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.account-option.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.account-option input {
+  accent-color: var(--accent);
+}
+.account-option img {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+.device-code {
+  display: block;
+  width: 100%;
+  margin: 16px 0 6px;
+  padding: 16px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font: 700 30px/1 "Cascadia Mono", Consolas, monospace;
+  letter-spacing: 0.15em;
+  color: var(--text);
+  cursor: pointer;
+}
+.center-text {
+  text-align: center;
+}

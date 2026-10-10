@@ -1,6 +1,8 @@
 # Blockyard
 
-Лаунчер Minecraft со встроенным каталогом модов Modrinth. Tauri 2 + Rust + React.
+Лаунчер Minecraft с каталогами Modrinth и CurseForge. Tauri 2 + Rust + React.
+
+**[⬇ Скачать последнюю версию](https://github.com/kirillshimarov-commits/blockyard/releases/latest)**
 
 ## Что умеет (v0.1)
 
@@ -12,7 +14,9 @@
 - **Моды с Modrinth и CurseForge:** поиск, сортировка, фильтр по версии сборки; установка в один клик вместе с обязательными зависимостями (например, Fabric API). Один и тот же мод из двух источников не ставится дважды
 - **Моды с запретом на стороннее скачивание** (часть CurseForge): лаунчер открывает страницу загрузки и сам переносит файл из папки «Загрузки» в сборку
 - **Java ставится сама:** нужная версия (8 / 17 / 21) скачивается с Adoptium при первом запуске
-- **Офлайн-аккаунт:** игра под любым ником
+- **Аккаунты:** вход через Microsoft (лицензия) или офлайн под любым ником
+- **Ресурспаки** с Modrinth и CurseForge, в том числе для ванильных сборок
+- **Обновление модов** одной кнопкой (Modrinth и CurseForge)
 - **Оформление:** полупрозрачное окно (Mica / Acrylic), светлая и тёмная тема, цвет акцентов, фон-градиент или своя картинка, скругления, масштаб, компактная панель
 - **Журнал игры** в реальном времени, остановка игры из лаунчера
 - Проверка SHA-1 у всех скачанных файлов, параллельная загрузка
@@ -49,6 +53,19 @@ pnpm tauri build    # установщик в src-tauri/target/release/bundle/
 
 Без ключа вкладка CurseForge неактивна, Modrinth работает как обычно.
 
+## Вход через Microsoft
+
+Нужно один раз зарегистрировать приложение в Azure:
+
+1. [portal.azure.com](https://portal.azure.com) → **App registrations** → **New registration**: любое имя, тип аккаунтов **Personal Microsoft accounts only**.
+2. В приложении: **Authentication** → **Allow public client flows** → **Yes** → Save.
+3. Скопируйте **Application (client) ID** и добавьте секрет `MS_CLIENT_ID` в GitHub (Settings → Secrets and variables → Actions).
+4. Подайте заявку на доступ к Minecraft API: [aka.ms/mce-reviewappid](https://aka.ms/mce-reviewappid). Пока Mojang её не одобрит, вход будет падать с сообщением об этом.
+
+## Релизы
+
+Установщик для релиза собирается при пуше тега: `git tag v0.2.0 && git push origin v0.2.0` — он появится на странице **Releases**.
+
 ## Структура
 
 ```
@@ -66,12 +83,12 @@ src-tauri/src/
     modrinth.rs          поиск и установка модов с Modrinth
     curseforge.rs        поиск и установка модов с CurseForge
     mods.rs              общие типы, защита от дублей, ручные загрузки
+    updates.rs           проверка и установка обновлений модов
+    auth.rs              вход через Microsoft (device code → Xbox → Minecraft)
+    crash.rs             разбор отчётов о сбоях
     instance.rs          сборки
 ```
 
 ## Планы
 
-- [ ] Вход через Microsoft (лицензионные аккаунты)
-- [ ] Ресурспаки
 - [ ] Импорт модпака из файла и экспорт сборки в `.mrpack`
-- [ ] Обновление модов

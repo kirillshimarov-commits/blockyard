@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { api, errorText, Instance, loaderLabel } from "../api";
+import { api, ContentFolder, errorText, Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
 import InstanceCover from "../components/InstanceCover";
+import ContentList from "../components/ContentList";
+import UpdatesModal from "../components/UpdatesModal";
 
 interface Props {
   instance?: Instance;
@@ -12,19 +14,20 @@ interface Props {
   logs: string[];
   onPlay: () => void;
   onStop: () => void;
-  onBrowse: (content: "mod" | "shader") => void;
+  onBrowse: (content: "mod" | "shader" | "resourcepack") => void;
   onChanged: (inst: Instance) => void;
   onDeleted: () => void;
   notify: (text: string, error?: boolean) => void;
 }
 
-type Tab = "mods" | "shaders" | "log" | "options";
+type Tab = "mods" | "shaders" | "resourcepacks" | "log" | "options";
 
 export default function InstanceView(props: Props) {
   const { instance, status, logs, onPlay, onStop, onBrowse, onChanged, onDeleted, notify } = props;
   const [tab, setTab] = useState<Tab>("mods");
   const [showPending, setShowPending] = useState(false);
   const [playAfterPending, setPlayAfterPending] = useState(false);
+  const [showUpdates, setShowUpdates] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
   const prevState = useRef<string | undefined>(undefined);
@@ -51,9 +54,9 @@ export default function InstanceView(props: Props) {
   const progress = status?.progress;
   const percent = progress && progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : null;
 
-  async function removeMod(projectId: string) {
+  async function removeContent(folder: ContentFolder, projectId: string) {
     try {
-      onChanged(await api.removeMod(instance!.id, projectId));
+      onChanged(await api.removeContent(instance!.id, folder, projectId));
     } catch (e) {
       notify(errorText(e), true);
     }
@@ -147,6 +150,10 @@ export default function InstanceView(props: Props) {
         <button className={tab === "shaders" ? "on" : ""} onClick={() => setTab("shaders")}>
           Шейдеры {instance.shaders.length > 0 && <span className="badge">{instance.shaders.length}</span>}
         </button>
+        <button className={tab === "resourcepacks" ? "on" : ""} onClick={() => setTab("resourcepacks")}>
+          Ресурспаки{" "}
+          {instance.resourcepacks.length > 0 && <span className="badge">{instance.resourcepacks.length}</span>}
+        </button>
         <button className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>
           Журнал
         </button>
@@ -172,34 +179,22 @@ export default function InstanceView(props: Props) {
             )}
             <div className="row between">
               <span className="muted">{instance.mods.length ? "Установленные моды" : "Модов пока нет"}</span>
-              <button className="btn primary" onClick={() => onBrowse("mod")}>
-                <Icon name="plus" /> Добавить моды
-              </button>
-            </div>
-            <div className="mod-list">
-              {instance.mods.map((m) => (
-                <div key={m.projectId} className="mod-row">
-                  {m.iconUrl ? <img src={m.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
-                  <div className="grow">
-                    <div className="mod-title">{m.title}</div>
-                    <div className="muted small">
-                      <span className={`source-badge ${m.source}`}>
-                        {m.source === "curseforge" ? "CurseForge" : "Modrinth"}
-                      </span>{" "}
-                      {m.fileName}
-                    </div>
-                  </div>
-                  <button
-                    className="btn icon"
-                    title="Удалить"
-                    disabled={state !== "stopped"}
-                    onClick={() => removeMod(m.projectId)}
-                  >
-                    <Icon name="trash" />
+              <div className="row gap-sm">
+                {instance.mods.length > 0 && (
+                  <button className="btn" disabled={state !== "stopped"} onClick={() => setShowUpdates(true)}>
+                    Проверить обновления
                   </button>
-                </div>
-              ))}
+                )}
+                <button className="btn primary" onClick={() => onBrowse("mod")}>
+                  <Icon name="plus" /> Добавить моды
+                </button>
+              </div>
             </div>
+            <ContentList
+              items={instance.mods}
+              disabled={state !== "stopped"}
+              onRemove={(id) => removeContent("mods", id)}
+            />
           </>
         ))}
 
@@ -220,32 +215,37 @@ export default function InstanceView(props: Props) {
                 <Icon name="plus" /> Добавить шейдеры
               </button>
             </div>
-            <div className="mod-list">
-              {instance.shaders.map((m) => (
-                <div key={m.projectId} className="mod-row">
-                  {m.iconUrl ? <img src={m.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
-                  <div className="grow">
-                    <div className="mod-title">{m.title}</div>
-                    <div className="muted small">{m.fileName}</div>
-                  </div>
-                  <button
-                    className="btn icon"
-                    title="Удалить"
-                    disabled={state !== "stopped"}
-                    onClick={() =>
-                      api
-                        .removeShader(instance.id, m.projectId)
-                        .then(onChanged)
-                        .catch((e) => notify(errorText(e), true))
-                    }
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <ContentList
+              items={instance.shaders}
+              disabled={state !== "stopped"}
+              onRemove={(id) => removeContent("shaderpacks", id)}
+            />
           </>
         ))}
+
+      {tab === "resourcepacks" && (
+        <>
+          <div className="row between">
+            <span className="muted">
+              {instance.resourcepacks.length
+                ? "Включить: в игре Настройки → Пакеты ресурсов"
+                : "Ресурспаков пока нет"}
+            </span>
+            <button className="btn primary" onClick={() => onBrowse("resourcepack")}>
+              <Icon name="plus" /> Добавить ресурспаки
+            </button>
+          </div>
+          <ContentList
+            items={instance.resourcepacks}
+            disabled={state !== "stopped"}
+            onRemove={(id) => removeContent("resourcepacks", id)}
+          />
+        </>
+      )}
+
+      {showUpdates && (
+        <UpdatesModal instance={instance} onChanged={onChanged} onClose={() => setShowUpdates(false)} notify={notify} />
+      )}
 
       {showPending && (
         <PendingDownloadsModal

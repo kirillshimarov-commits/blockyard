@@ -31,6 +31,11 @@ const TEXT: Record<ContentKind, { title: string; subtitle: string; placeholder: 
     subtitle: "Красивый свет, тени и вода. Iris или Oculus установится автоматически",
     placeholder: "Поиск шейдеров…",
   },
+  resourcepack: {
+    title: "Ресурспаки",
+    subtitle: "Текстуры, звуки и интерфейс. Работают и в ванильных сборках",
+    placeholder: "Поиск ресурспаков…",
+  },
   modpack: {
     title: "Готовые сборки",
     subtitle: "Модпаки в один клик: версия, загрузчик, моды и настройки ставятся сами",
@@ -44,7 +49,11 @@ function normalize(title: string) {
 
 export default function Browse(props: Props) {
   const { kind, instances, initialInstanceId, onChanged, onCreated, onOpenInstance, notify } = props;
-  const targets = useMemo(() => instances.filter((i) => i.loader.type !== "vanilla"), [instances]);
+  // Resource packs work without a mod loader; mods and shaders need one.
+  const targets = useMemo(
+    () => (kind === "resourcepack" ? instances : instances.filter((i) => i.loader.type !== "vanilla")),
+    [instances, kind],
+  );
   const [instanceId, setInstanceId] = useState(initialInstanceId ?? targets[0]?.id ?? "");
   const [source, setSource] = useState<Source>("modrinth");
   const [curseforge, setCurseforge] = useState(false);
@@ -59,7 +68,8 @@ export default function Browse(props: Props) {
 
   const needsTarget = kind !== "modpack";
   const instance = needsTarget ? targets.find((i) => i.id === instanceId) : undefined;
-  const owned = kind === "shader" ? instance?.shaders : instance?.mods;
+  const owned =
+    kind === "shader" ? instance?.shaders : kind === "resourcepack" ? instance?.resourcepacks : instance?.mods;
   const installedIds = useMemo(() => new Set(owned?.map((m) => `${m.source}:${m.projectId}`)), [owned]);
   const installedTitles = useMemo(() => new Set(owned?.map((m) => normalize(m.title))), [owned]);
   const pendingIds = useMemo(() => new Set(instance?.pending.map((p) => p.projectId)), [instance]);
@@ -74,7 +84,7 @@ export default function Browse(props: Props) {
     setError("");
     try {
       const loader = kind === "mod" && instance && instance.loader.type !== "vanilla" ? instance.loader.type : null;
-      const gameVersion = kind === "mod" ? (instance?.gameVersion ?? null) : null;
+      const gameVersion = kind === "mod" || kind === "resourcepack" ? (instance?.gameVersion ?? null) : null;
       const res = await api.search(kind, source, query, gameVersion, loader, sort, offset);
       setHits((prev) => (offset === 0 ? res.hits : [...prev, ...res.hits]));
       setTotal(res.totalHits);
@@ -121,9 +131,9 @@ export default function Browse(props: Props) {
         onCreated(inst);
       } else if (instance) {
         const res =
-          kind === "shader"
-            ? await api.installShader(instance.id, hit.source, hit.projectId)
-            : await api.installMod(instance.id, hit.source, hit.projectId);
+          kind === "mod"
+            ? await api.installMod(instance.id, hit.source, hit.projectId)
+            : await api.installAsset(instance.id, hit.source, hit.projectId, kind);
         reportResult(hit, res);
       }
     } catch (e) {
@@ -157,7 +167,9 @@ export default function Browse(props: Props) {
               </select>
             </label>
           ) : (
-            <span className="hint">Создайте сборку с загрузчиком модов (Fabric, Forge…)</span>
+            <span className="hint">
+              {kind === "resourcepack" ? "Сначала создайте сборку" : "Создайте сборку с загрузчиком модов (Fabric, Forge…)"}
+            </span>
           ))}
       </header>
 

@@ -2,7 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type LoaderType = "fabric" | "quilt" | "forge" | "neoforge";
 export type Loader = { type: "vanilla" } | { type: LoaderType; version: string };
-export type ContentKind = "mod" | "shader" | "modpack";
+export type ContentKind = "mod" | "shader" | "modpack" | "resourcepack";
+export type Asset = "shader" | "resourcepack";
+export type ContentFolder = "mods" | "shaderpacks" | "resourcepacks";
 
 export type Source = "modrinth" | "curseforge";
 
@@ -26,6 +28,7 @@ export interface Instance {
   mods: InstalledMod[];
   pending: PendingDownload[];
   shaders: InstalledMod[];
+  resourcepacks: InstalledMod[];
   iconUrl?: string | null;
   modpack?: { source: Source; projectId: string; versionId: string; title: string } | null;
 }
@@ -42,6 +45,29 @@ export interface PendingDownload {
 export interface Settings {
   username: string;
   memoryMb: number;
+  /** UUID of the Microsoft account in use; offline when empty. */
+  activeAccount?: string | null;
+}
+
+export interface Account {
+  uuid: string;
+  username: string;
+}
+
+export interface DeviceCode {
+  userCode: string;
+  deviceCode: string;
+  verificationUri: string;
+  interval: number;
+  expiresIn: number;
+}
+
+export interface ModUpdate {
+  source: Source;
+  projectId: string;
+  title: string;
+  currentFile: string;
+  newFile: string;
 }
 
 export interface McVersion {
@@ -129,12 +155,20 @@ export const api = {
   ) => invoke<SearchResult>("search_mods", { kind, source, query, gameVersion, loader, sort, offset }),
   installMod: (instanceId: string, source: Source, projectId: string) =>
     invoke<InstallResult>("install_mod", { instanceId, source, projectId }),
-  installShader: (instanceId: string, source: Source, projectId: string) =>
-    invoke<InstallResult>("install_shader", { instanceId, source, projectId }),
-  removeShader: (instanceId: string, projectId: string) => invoke<Instance>("remove_shader", { instanceId, projectId }),
+  installAsset: (instanceId: string, source: Source, projectId: string, asset: Asset) =>
+    invoke<InstallResult>("install_asset", { instanceId, source, projectId, asset }),
+  removeContent: (instanceId: string, folder: ContentFolder, projectId: string) =>
+    invoke<Instance>("remove_content", { instanceId, folder, projectId }),
+  checkModUpdates: (instanceId: string) => invoke<ModUpdate[]>("check_mod_updates", { instanceId }),
+  applyModUpdates: (instanceId: string, projectIds: string[]) =>
+    invoke<Instance>("apply_mod_updates", { instanceId, projectIds }),
+  microsoftAvailable: () => invoke<boolean>("microsoft_available"),
+  listAccounts: () => invoke<Account[]>("list_accounts"),
+  startMicrosoftLogin: () => invoke<DeviceCode>("start_microsoft_login"),
+  finishMicrosoftLogin: (code: DeviceCode) => invoke<Account>("finish_microsoft_login", { code }),
+  removeAccount: (uuid: string) => invoke<Settings>("remove_account", { uuid }),
   installModpack: (source: Source, projectId: string) => invoke<Instance>("install_modpack", { source, projectId }),
   importPendingMods: (instanceId: string) => invoke<Instance>("import_pending_mods", { instanceId }),
-  removeMod: (instanceId: string, projectId: string) => invoke<Instance>("remove_mod", { instanceId, projectId }),
 };
 
 export const LOADER_NAMES: Record<Loader["type"], string> = {

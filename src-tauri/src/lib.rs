@@ -3,8 +3,10 @@ mod launcher;
 use crate::launcher::instance::{self, Instance, Loader};
 use crate::launcher::settings::{self, Settings};
 use crate::launcher::appearance;
+use crate::launcher::auth;
+use crate::launcher::updates;
 use crate::launcher::crash;
-use crate::launcher::mods::{self, ContentKind, Source};
+use crate::launcher::mods::{self, Asset, ContentKind, Source};
 use crate::launcher::{curseforge, fabric, forge, launch, modpack, modrinth, mojang, Progress, Reporter};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -159,7 +161,11 @@ fn running_instances(running: State<'_, Running>) -> Vec<String> {
 #[tauri::command]
 async fn launch_instance(app: AppHandle, id: String, running: State<'_, Running>) -> CmdResult<()> {
     let mut inst = instance::get(&id).map_err(err)?;
-    let username = settings::load().username;
+    let settings = settings::load();
+    let session = match &settings.active_account {
+        Some(uuid) => auth::session(uuid).await.map_err(err)?,
+        None => launch::offline_session(&settings.username),
+    };
     let stop = Arc::new(Notify::new());
     {
         let mut map = running.0.lock().unwrap();
@@ -171,14 +177,14 @@ async fn launch_instance(app: AppHandle, id: String, running: State<'_, Running>
 
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
-        let result = run_game(&app2, &mut inst, &username, stop).await;
+        let result = run_game(&app2, &mut inst, &session, stop).await;
         app2.state::<Running>().0.lock().unwrap().remove(&inst.id);
         emit_stopped(&app2, &inst.id, result);
     });
     Ok(())
 }
 
-async fn run_game(app: &AppHandle, inst: &mut Instance, username: &str, stop: Arc<Notify>) -> anyhow::Result<()> {
+async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session, stop: Arc<Notify>) -> anyhow::Result<()> {
     emit_state(app, &inst.id, "installing", None);
     let app_for_progress = app.clone();
     let id_for_progress = inst.id.clone();
@@ -187,7 +193,7 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, username: &str, stop: Ar
     });
 
     let prepared = tokio::select! {
-        p = launch::prepare(inst, username, &reporter) => p?,
+        p = launch::prepare(inst, session, &reporter) => p?,
         _ = stop.notified() => return Ok(()),
     };
     let started = std::time::SystemTime::now();
@@ -266,17 +272,71 @@ async fn install_mod(instance_id: String, source: Source, project_id: String) ->
 }
 
 #[tauri::command]
-async fn install_shader(instance_id: String, source: Source, project_id: String) -> CmdResult<mods::InstallResult> {
+async fn install_asset(
+    instance_id: String,
+    source: Source,
+    project_id: String,
+    asset: Asset,
+) -> CmdResult<mods::InstallResult> {
     match source {
-        Source::Modrinth => modrinth::install_shader(&instance_id, &project_id).await,
-        Source::Curseforge => curseforge::install_shader(&instance_id, &project_id).await,
+        Source::Modrinth => modrinth::install_asset(&instance_id, &project_id, asset).await,
+        Source::Curseforge => curseforge::install_asset(&instance_id, &project_id, asset).await,
     }
     .map_err(err)
 }
 
+/// Removes a mod, shader or resource pack; `folder` is "mods", "shaderpacks" or "resourcepacks".
 #[tauri::command]
-fn remove_shader(instance_id: String, project_id: String) -> CmdResult<Instance> {
-    instance::remove_shader(&instance_id, &project_id).map_err(err)
+fn remove_content(instance_id: String, folder: String, project_id: String) -> CmdResult<Instance> {
+    instance::remove_content(&instance_id, &folder, &project_id).map_err(err)
+}
+
+#[tauri::command]
+async fn check_mod_updates(instance_id: String) -> CmdResult<Vec<updates::ModUpdate>> {
+    updates::check(&instance_id).await.map_err(err)
+}
+
+#[tauri::command]
+async fn apply_mod_updates(instance_id: String, project_ids: Vec<String>) -> CmdResult<Instance> {
+    updates::apply(&instance_id, &project_ids).await.map_err(err)
+}
+
+// ---------- Microsoft accounts ----------
+
+#[tauri::command]
+fn microsoft_available() -> bool {
+    auth::is_available()
+}
+
+#[tauri::command]
+fn list_accounts() -> Vec<auth::AccountInfo> {
+    auth::list()
+}
+
+#[tauri::command]
+async fn start_microsoft_login() -> CmdResult<auth::DeviceCode> {
+    auth::start_login().await.map_err(err)
+}
+
+/// Waits for the user to enter the code, saves the account and makes it active.
+#[tauri::command]
+async fn finish_microsoft_login(code: auth::DeviceCode) -> CmdResult<auth::AccountInfo> {
+    let account = auth::finish_login(&code).await.map_err(err)?;
+    let mut s = settings::load();
+    s.active_account = Some(account.uuid.clone());
+    settings::save(&s).map_err(err)?;
+    Ok(account)
+}
+
+#[tauri::command]
+fn remove_account(uuid: String) -> CmdResult<Settings> {
+    auth::remove(&uuid).map_err(err)?;
+    let mut s = settings::load();
+    if s.active_account.as_deref() == Some(uuid.as_str()) {
+        s.active_account = None;
+        settings::save(&s).map_err(err)?;
+    }
+    Ok(s)
 }
 
 /// Creates an instance for the modpack right away and installs it in the background,
@@ -316,11 +376,6 @@ async fn install_modpack(
 #[tauri::command]
 fn import_pending_mods(instance_id: String) -> CmdResult<Instance> {
     mods::import_pending(&instance_id).map_err(err)
-}
-
-#[tauri::command]
-fn remove_mod(instance_id: String, project_id: String) -> CmdResult<Instance> {
-    instance::remove_mod(&instance_id, &project_id).map_err(err)
 }
 
 // ---------- Appearance ----------
@@ -408,13 +463,19 @@ pub fn run() {
             search_mods,
             install_mod,
             import_pending_mods,
-            install_shader,
-            remove_shader,
+            install_asset,
+            remove_content,
+            check_mod_updates,
+            apply_mod_updates,
+            microsoft_available,
+            list_accounts,
+            start_microsoft_login,
+            finish_microsoft_login,
+            remove_account,
             install_modpack,
             get_appearance,
             save_appearance,
             set_window_style,
-            remove_mod,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

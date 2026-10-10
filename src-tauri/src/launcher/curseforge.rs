@@ -5,7 +5,7 @@
 
 use super::http::{self, Download};
 use super::instance::{self, InstalledMod};
-use super::mods::{self, ContentKind, InstallResult, ModHit, PendingDownload, SearchResult, Source};
+use super::mods::{self, Asset, ContentKind, InstallResult, ModHit, PendingDownload, SearchResult, Source};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -193,6 +193,7 @@ pub async fn search(
         ContentKind::Mod => MODS_CLASS_ID,
         ContentKind::Shader => SHADERS_CLASS_ID,
         ContentKind::Modpack => MODPACKS_CLASS_ID,
+        ContentKind::Resourcepack => RESOURCE_PACKS_CLASS_ID,
     };
     let mut url = format!(
         "/mods/search?gameId={MINECRAFT_GAME_ID}&classId={class_id}&searchFilter={}&sortField={sort_field}&sortOrder=desc&index={offset}&pageSize=20",
@@ -202,7 +203,7 @@ pub async fn search(
         if let Some(v) = game_version {
             url.push_str(&format!("&gameVersion={}", urlencoding::encode(v)));
         }
-        if let Some(t) = loader.and_then(loader_type) {
+        if let (Some(t), ContentKind::Mod | ContentKind::Modpack) = (loader.and_then(loader_type), kind) {
             url.push_str(&format!("&modLoaderType={t}"));
         }
     }
@@ -331,44 +332,59 @@ pub async fn install(instance_id: &str, project_id: &str) -> Result<InstallResul
     Ok(InstallResult { installed, pending, ..InstallResult::new(inst) })
 }
 
-/// Installs a shader pack, plus Iris/Oculus (from Modrinth) if the instance lacks it.
-pub async fn install_shader(instance_id: &str, project_id: &str) -> Result<InstallResult> {
+/// Installs a shader or resource pack. Shaders also get Iris/Oculus (from Modrinth) if missing.
+pub async fn install_asset(instance_id: &str, project_id: &str, asset: Asset) -> Result<InstallResult> {
     let inst = instance::get(instance_id)?;
-    let shader_mod = inst
-        .loader
-        .shader_mod()
-        .ok_or_else(|| anyhow!("Для шейдеров нужна сборка с загрузчиком модов (Fabric, Forge…)"))?;
-    let mut result = match super::modrinth::install(instance_id, shader_mod).await {
-        Ok(r) => r,
-        Err(e) => {
-            let mut r = InstallResult::new(inst);
-            r.warnings.push(format!("Не удалось поставить {shader_mod}: {e:#}. Без него шейдеры не заработают."));
-            r
+    let game_version = inst.game_version.clone();
+    let mut result = InstallResult::new(inst);
+    if asset == Asset::Shader {
+        let shader_mod = result
+            .instance
+            .loader
+            .shader_mod()
+            .ok_or_else(|| anyhow!("Для шейдеров нужна сборка с загрузчиком модов (Fabric, Forge…)"))?;
+        match super::modrinth::install(instance_id, shader_mod).await {
+            Ok(r) => result = r,
+            Err(e) => result
+                .warnings
+                .push(format!("Не удалось поставить {shader_mod}: {e:#}. Без него шейдеры не заработают.")),
         }
-    };
+    }
     let mut inst = instance::get(instance_id)?;
+    let folder = asset.folder();
     let mod_id: u64 = project_id.parse().context("неверный id CurseForge")?;
-    if inst.shaders.iter().any(|s| s.project_id == project_id) || inst.pending.iter().any(|p| p.project_id == project_id) {
+    let already = inst.list_mut(folder).is_some_and(|l| l.iter().any(|m| m.project_id == project_id))
+        || inst.pending.iter().any(|p| p.project_id == project_id);
+    if already {
         result.instance = inst;
         return Ok(result);
     }
     let info: Mod = get::<Envelope<Mod>>(&format!("/mods/{mod_id}")).await?.data;
-    let file = latest_compatible(mod_id, None, None)
-        .await?
-        .ok_or_else(|| anyhow!("У этого шейдера нет файлов"))?;
+    let file = match asset {
+        Asset::Shader => latest_compatible(mod_id, None, None).await?,
+        Asset::Resourcepack => match latest_compatible(mod_id, Some(&game_version), None).await? {
+            Some(f) => Some(f),
+            None => latest_compatible(mod_id, None, None).await?,
+        },
+    }
+    .ok_or_else(|| anyhow!("У «{}» нет файлов", info.name))?;
     mods::check_file_name(&file.file_name)?;
     let sha1 = file.hashes.iter().find(|h| h.algo == HASH_SHA1).map(|h| h.value.clone());
     match &file.download_url {
         Some(url) => {
-            http::download(&Download { url: url.clone(), path: inst.shaderpacks_dir().join(&file.file_name), sha1 }).await?;
-            inst.shaders.push(InstalledMod {
+            http::download(&Download { url: url.clone(), path: inst.game_dir().join(folder).join(&file.file_name), sha1 })
+                .await?;
+            let entry = InstalledMod {
                 source: Source::Curseforge,
                 project_id: project_id.to_string(),
                 version_id: file.id.to_string(),
                 title: info.name.clone(),
                 file_name: file.file_name.clone(),
                 icon_url: info.icon(),
-            });
+            };
+            if let Some(list) = inst.list_mut(folder) {
+                list.push(entry);
+            }
             result.installed.push(info.name);
         }
         None => {
@@ -379,9 +395,9 @@ pub async fn install_shader(instance_id: &str, project_id: &str) -> Result<Insta
                 title: info.name.clone(),
                 file_name: file.file_name.clone(),
                 sha1,
-                page_url: format!("https://www.curseforge.com/minecraft/shaders/{}/download/{}", info.slug, file.id),
+                page_url: format!("{}/download/{}", info.page_url(), file.id),
                 icon_url: info.icon(),
-                folder: "shaderpacks".into(),
+                folder: folder.into(),
             };
             result.pending.push(p.clone());
             inst.pending.push(p);

@@ -1,5 +1,6 @@
 //! Preparing and starting the game process.
 
+use super::auth::Session;
 use super::instance::{Instance, Loader};
 use super::mojang::{self, ArgValue, Argument, AssetLayout, VersionJson};
 use super::fabric::{self, Flavor};
@@ -38,7 +39,18 @@ async fn load_version(instance: &Instance, reporter: &Reporter) -> Result<Versio
 }
 
 /// Downloads everything the instance needs and builds the java command line.
-pub async fn prepare(instance: &Instance, username: &str, reporter: &Reporter) -> Result<Prepared> {
+/// Offline session: any nickname, the same UUID the vanilla server would assign.
+pub fn offline_session(username: &str) -> Session {
+    Session {
+        username: username.to_string(),
+        uuid: offline_uuid(username),
+        access_token: "0".into(),
+        user_type: "legacy",
+    }
+}
+
+pub async fn prepare(instance: &Instance, session: &Session, reporter: &Reporter) -> Result<Prepared> {
+    let username = session.username.as_str();
     report(reporter, "Подготовка", 0, 1);
     let version = load_version(instance, reporter).await.context("не удалось загрузить данные версии")?;
     let game_dir = instance.game_dir();
@@ -64,7 +76,7 @@ pub async fn prepare(instance: &Instance, username: &str, reporter: &Reporter) -
         AssetLayout::Resources => game_dir.join("resources"),
         AssetLayout::Normal => assets_root.clone(),
     };
-    let uuid = offline_uuid(username);
+    let uuid = session.uuid.clone();
     let path_str = |p: &PathBuf| p.to_string_lossy().into_owned();
 
     let vars: HashMap<&str, String> = HashMap::from([
@@ -75,11 +87,11 @@ pub async fn prepare(instance: &Instance, username: &str, reporter: &Reporter) -
         ("game_assets", path_str(&game_assets)),
         ("assets_index_name", version.asset_index.as_ref().map(|a| a.id.clone()).unwrap_or_default()),
         ("auth_uuid", uuid.clone()),
-        ("auth_access_token", "0".to_string()),
-        ("auth_session", "0".to_string()),
+        ("auth_access_token", session.access_token.clone()),
+        ("auth_session", session.access_token.clone()),
         ("auth_xuid", "0".to_string()),
         ("clientid", "0".to_string()),
-        ("user_type", "legacy".to_string()),
+        ("user_type", session.user_type.to_string()),
         ("user_properties", "{}".to_string()),
         ("version_type", version.kind.clone().unwrap_or_else(|| "release".into())),
         ("natives_directory", path_str(&natives_dir)),

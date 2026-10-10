@@ -2,7 +2,7 @@
 
 use super::http::{self, Download};
 use super::instance::{self, InstalledMod};
-use super::mods::{self, ContentKind, InstallResult, ModHit, SearchResult, Source};
+use super::mods::{self, Asset, ContentKind, InstallResult, ModHit, SearchResult, Source};
 use anyhow::{anyhow, bail, Result};
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -76,7 +76,7 @@ fn enc(s: &str) -> String {
 }
 
 /// Modrinth loader names accepted for a given loader (Quilt runs Fabric mods too).
-fn compatible_loaders(loader: &str) -> Vec<&str> {
+pub(crate) fn compatible_loaders(loader: &str) -> Vec<&str> {
     match loader {
         "quilt" => vec!["quilt", "fabric"],
         other => vec![other],
@@ -92,11 +92,13 @@ pub async fn search(
     sort: &str,
     offset: u64,
 ) -> Result<SearchResult> {
-    let (project_type, path) = match kind {
-        ContentKind::Mod => ("mod", "mod"),
-        ContentKind::Shader => ("shader", "shader"),
-        ContentKind::Modpack => ("modpack", "modpack"),
+    let project_type = match kind {
+        ContentKind::Mod => "mod",
+        ContentKind::Shader => "shader",
+        ContentKind::Modpack => "modpack",
+        ContentKind::Resourcepack => "resourcepack",
     };
+    let path = project_type;
     let mut facets = vec![vec![format!("project_type:{project_type}")]];
     if kind == ContentKind::Shader {
         // Packs that Iris/Oculus can load.
@@ -105,7 +107,7 @@ pub async fn search(
         if let Some(v) = game_version {
             facets.push(vec![format!("versions:{v}")]);
         }
-        if let Some(l) = loader {
+        if let (Some(l), ContentKind::Mod | ContentKind::Modpack) = (loader, kind) {
             facets.push(compatible_loaders(l).into_iter().map(|l| format!("categories:{l}")).collect());
         }
     }
@@ -161,7 +163,7 @@ pub(crate) async fn project(id_or_slug: &str) -> Result<Project> {
     http::get_json(&format!("{API_URL}/project/{}", enc(id_or_slug))).await
 }
 
-fn primary_file(version: &Version) -> Result<&VersionFile> {
+pub(crate) fn primary_file(version: &Version) -> Result<&VersionFile> {
     let file = version
         .files
         .iter()
@@ -238,48 +240,61 @@ pub async fn install(instance_id: &str, project_id: &str) -> Result<InstallResul
     Ok(InstallResult { installed: installed_titles, ..InstallResult::new(inst) })
 }
 
-/// Installs a shader pack, plus Iris/Oculus if the instance does not have it yet.
-pub async fn install_shader(instance_id: &str, project_id: &str) -> Result<InstallResult> {
+/// Installs a shader or resource pack. Shaders also get Iris/Oculus if the instance lacks it.
+pub async fn install_asset(instance_id: &str, project_id: &str, asset: Asset) -> Result<InstallResult> {
     let inst = instance::get(instance_id)?;
-    let shader_mod = inst
-        .loader
-        .shader_mod()
-        .ok_or_else(|| anyhow!("Для шейдеров нужна сборка с загрузчиком модов (Fabric, Forge…)"))?;
+    let game_version = inst.game_version.clone();
+    let mut result = InstallResult::new(inst);
 
-    // The shader loader mod first, so a failure there does not leave a half-done install.
-    let mut result = match install(instance_id, shader_mod).await {
-        Ok(r) => r,
-        Err(e) => {
-            let mut r = InstallResult::new(inst);
-            r.warnings.push(format!("Не удалось поставить {shader_mod}: {e:#}. Без него шейдеры не заработают."));
-            r
+    if asset == Asset::Shader {
+        let shader_mod = result
+            .instance
+            .loader
+            .shader_mod()
+            .ok_or_else(|| anyhow!("Для шейдеров нужна сборка с загрузчиком модов (Fabric, Forge…)"))?;
+        // The shader loader mod first, so a failure there does not leave a half-done install.
+        match install(instance_id, shader_mod).await {
+            Ok(r) => result = r,
+            Err(e) => result
+                .warnings
+                .push(format!("Не удалось поставить {shader_mod}: {e:#}. Без него шейдеры не заработают.")),
         }
-    };
+    }
     let mut inst = instance::get(instance_id)?;
 
     let project = project(project_id).await?;
-    if inst.shaders.iter().any(|s| s.project_id == project.id) {
+    let folder = asset.folder();
+    if inst.list_mut(folder).is_some_and(|l| l.iter().any(|m| m.project_id == project.id)) {
         result.instance = inst;
         return Ok(result);
     }
-    let version = latest_version(&project.id, None, Some(&["iris", "optifine"]))
-        .await?
-        .ok_or_else(|| anyhow!("У этого шейдера нет файлов для Iris/OptiFine"))?;
+    let version = match asset {
+        Asset::Shader => latest_version(&project.id, None, Some(&["iris", "optifine"])).await?,
+        // Prefer a build for this game version; packs often work across versions anyway.
+        Asset::Resourcepack => match latest_version(&project.id, Some(&game_version), Some(&["minecraft"])).await? {
+            Some(v) => Some(v),
+            None => latest_version(&project.id, None, None).await?,
+        },
+    }
+    .ok_or_else(|| anyhow!("У «{}» нет подходящих файлов", project.title))?;
     let file = primary_file(&version)?;
     http::download(&Download {
         url: file.url.clone(),
-        path: inst.shaderpacks_dir().join(&file.filename),
+        path: inst.game_dir().join(folder).join(&file.filename),
         sha1: file.hashes.sha1.clone(),
     })
     .await?;
-    inst.shaders.push(InstalledMod {
+    let entry = InstalledMod {
         source: Source::Modrinth,
         project_id: project.id,
         version_id: version.id.clone(),
         title: project.title.clone(),
         file_name: file.filename.clone(),
         icon_url: project.icon_url,
-    });
+    };
+    if let Some(list) = inst.list_mut(folder) {
+        list.push(entry);
+    }
     inst.save()?;
     result.installed.push(project.title);
     result.instance = inst;

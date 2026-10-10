@@ -9,11 +9,13 @@ pub struct Settings {
     pub username: String,
     /// Default RAM for new instances, in MB.
     pub memory_mb: u32,
+    /// UUID of the Microsoft account to play with; offline when empty.
+    pub active_account: Option<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { username: "Player".into(), memory_mb: 4096 }
+        Self { username: "Player".into(), memory_mb: 4096, active_account: None }
     }
 }
 

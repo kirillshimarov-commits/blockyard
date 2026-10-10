@@ -20,6 +20,24 @@ pub enum ContentKind {
     Mod,
     Shader,
     Modpack,
+    Resourcepack,
+}
+
+/// Content that is a plain file dropped into a game folder (no dependencies).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Asset {
+    Shader,
+    Resourcepack,
+}
+
+impl Asset {
+    pub fn folder(self) -> &'static str {
+        match self {
+            Asset::Shader => "shaderpacks",
+            Asset::Resourcepack => "resourcepacks",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -144,10 +162,8 @@ pub fn import_pending(instance_id: &str) -> Result<Instance> {
             file_name: p.file_name,
             icon_url: p.icon_url,
         };
-        match folder {
-            "shaderpacks" => inst.shaders.push(entry),
-            "resourcepacks" => {}
-            _ => inst.mods.push(entry),
+        if let Some(list) = inst.list_mut(folder) {
+            list.push(entry);
         }
     }
     inst.pending = still_pending;

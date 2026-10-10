@@ -1,5 +1,7 @@
-import { useRef, useState } from "react";
-import { api, errorText, Settings } from "../api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Account, api, errorText, Settings } from "../api";
+import MicrosoftLoginModal from "../components/MicrosoftLoginModal";
+import { Icon } from "../components/Icon";
 import {
   ACCENTS,
   Appearance,
@@ -101,6 +103,46 @@ function Slider({
 export default function SettingsPage(props: Props) {
   const { settings, onSaved, appearance: a, activeEffect, onAppearanceChange, notify } = props;
   const [draft, setDraft] = useState(settings);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [msAvailable, setMsAvailable] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  useEffect(() => {
+    api.listAccounts().then(setAccounts).catch(() => {});
+    api.microsoftAvailable().then(setMsAvailable).catch(() => {});
+  }, []);
+
+  async function selectAccount(activeAccount: string | null) {
+    const next = { ...settings, activeAccount };
+    try {
+      await api.saveSettings(next);
+      onSaved(next);
+      setDraft((d) => ({ ...d, activeAccount }));
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
+
+  async function removeAccount(uuid: string) {
+    try {
+      const next = await api.removeAccount(uuid);
+      setAccounts(await api.listAccounts());
+      onSaved(next);
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
+
+  const onLoggedIn = useCallback(
+    async (account: Account) => {
+      setLoggingIn(false);
+      setAccounts(await api.listAccounts());
+      onSaved({ ...settings, activeAccount: account.uuid });
+      notify(`Вы вошли как ${account.username}`);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings],
+  );
   const fileInput = useRef<HTMLInputElement>(null);
   const valid = /^[A-Za-z0-9_]{3,16}$/.test(draft.username);
   const dirty = draft.username !== settings.username || draft.memoryMb !== settings.memoryMb;
@@ -109,8 +151,9 @@ export default function SettingsPage(props: Props) {
 
   async function save() {
     try {
-      await api.saveSettings(draft);
-      onSaved(draft);
+      const next = { ...draft, activeAccount: settings.activeAccount };
+      await api.saveSettings(next);
+      onSaved(next);
       notify("Настройки сохранены");
     } catch (e) {
       notify(errorText(e), true);
@@ -137,8 +180,48 @@ export default function SettingsPage(props: Props) {
 
       <section className="card">
         <h3>Аккаунт</h3>
-        <label className="field">
-          <span>Ник в игре</span>
+        <div className="accounts">
+          {accounts.map((acc) => (
+            <label key={acc.uuid} className={`account-option ${settings.activeAccount === acc.uuid ? "on" : ""}`}>
+              <input
+                type="radio"
+                name="account"
+                checked={settings.activeAccount === acc.uuid}
+                onChange={() => selectAccount(acc.uuid)}
+              />
+              <img src={`https://mc-heads.net/avatar/${acc.uuid}/32`} alt="" />
+              <div className="grow">
+                <div className="mod-title">{acc.username}</div>
+                <div className="muted small">Microsoft · лицензия</div>
+              </div>
+              <button className="btn icon" title="Выйти" onClick={() => removeAccount(acc.uuid)}>
+                <Icon name="trash" />
+              </button>
+            </label>
+          ))}
+          <label className={`account-option ${!settings.activeAccount ? "on" : ""}`}>
+            <input type="radio" name="account" checked={!settings.activeAccount} onChange={() => selectAccount(null)} />
+            <div className="avatar">{settings.username.slice(0, 1).toUpperCase()}</div>
+            <div className="grow">
+              <div className="mod-title">{settings.username}</div>
+              <div className="muted small">Офлайн · серверы без проверки лицензии</div>
+            </div>
+          </label>
+        </div>
+        <button
+          className="btn"
+          disabled={!msAvailable}
+          title={msAvailable ? undefined : "В этой сборке лаунчера не настроен вход через Microsoft"}
+          onClick={() => setLoggingIn(true)}
+        >
+          <Icon name="user" /> Войти через Microsoft
+        </button>
+        {!msAvailable && (
+          <p className="muted small">Вход через Microsoft появится, когда в сборку добавят MS_CLIENT_ID.</p>
+        )}
+
+        <label className="field section-gap">
+          <span>Ник для офлайн-режима</span>
           <input
             value={draft.username}
             maxLength={16}
@@ -146,7 +229,6 @@ export default function SettingsPage(props: Props) {
           />
         </label>
         {!valid && <div className="hint">От 3 до 16 символов: латинские буквы, цифры и _</div>}
-        <p className="muted small">Офлайн-режим: одиночная игра и серверы без проверки лицензии.</p>
 
         <h3 className="section-gap">Новые сборки</h3>
         <Slider
@@ -164,6 +246,8 @@ export default function SettingsPage(props: Props) {
           </button>
         </div>
       </section>
+
+      {loggingIn && <MicrosoftLoginModal onClose={() => setLoggingIn(false)} onDone={onLoggedIn} />}
 
       <section className="card">
         <div className="row between">

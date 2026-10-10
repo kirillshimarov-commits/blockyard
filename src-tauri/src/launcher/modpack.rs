@@ -281,10 +281,9 @@ async fn install_mrpack(inst: &mut Instance, archive: &Path, reporter: &Reporter
             file_name,
             icon_url: project.and_then(|p| p.icon_url.clone()),
         };
-        if path.starts_with("mods/") {
-            inst.mods.push(entry);
-        } else if path.starts_with("shaderpacks/") {
-            inst.shaders.push(entry);
+        let folder = path.split('/').next().unwrap_or_default();
+        if let Some(list) = inst.list_mut(folder) {
+            list.push(entry);
         }
     }
     inst.mods.sort_by_key(|m| m.title.to_lowercase());
@@ -396,10 +395,8 @@ async fn install_curseforge(inst: &mut Instance, archive: &Path, reporter: &Repo
         match &file.download_url {
             Some(url) => {
                 downloads.push(Download { url: url.clone(), path: game_dir.join(folder).join(&file.file_name), sha1 });
-                match folder {
-                    "mods" => inst.mods.push(entry),
-                    "shaderpacks" => inst.shaders.push(entry),
-                    _ => {}
+                if let Some(list) = inst.list_mut(folder) {
+                    list.push(entry);
                 }
             }
             None => inst.pending.push(PendingDownload {

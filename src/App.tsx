@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, ContentKind, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
+import { Account, api, ContentKind, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
 import Library from "./pages/Library";
 import InstanceView from "./pages/InstanceView";
 import Browse from "./pages/Browse";
@@ -38,6 +38,13 @@ export default function App() {
   const [logs, setLogs] = useState<Record<string, string[]>>({});
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const activeAccount = accounts.find((a) => a.uuid === settings?.activeAccount);
+
+  // Refresh the account list whenever the active account changes (login, logout, switch).
+  useEffect(() => {
+    api.listAccounts().then(setAccounts).catch(() => {});
+  }, [settings?.activeAccount]);
   const [activeEffect, setActiveEffect] = useState("none");
   const saveTimer = useRef<number | undefined>(undefined);
 
@@ -137,6 +144,7 @@ export default function App() {
     { key: "library", view: { kind: "library" }, label: "Библиотека", icon: "grid" },
     { key: "mod", view: { kind: "browse", content: "mod" }, label: "Моды", icon: "puzzle" },
     { key: "shader", view: { kind: "browse", content: "shader" }, label: "Шейдеры", icon: "sun" },
+    { key: "resourcepack", view: { kind: "browse", content: "resourcepack" }, label: "Ресурспаки", icon: "image" },
     { key: "modpack", view: { kind: "browse", content: "modpack" }, label: "Готовые сборки", icon: "layers" },
     { key: "settings", view: { kind: "settings" }, label: "Настройки", icon: "gear" },
   ];
@@ -179,10 +187,14 @@ export default function App() {
           </div>
         )}
         <div className="account">
-          <div className="avatar">{settings?.username.slice(0, 1).toUpperCase() ?? "?"}</div>
+          {activeAccount ? (
+            <img className="avatar" src={`https://mc-heads.net/avatar/${activeAccount.uuid}/34`} alt="" />
+          ) : (
+            <div className="avatar">{settings?.username.slice(0, 1).toUpperCase() ?? "?"}</div>
+          )}
           <div>
-            <div className="account-name">{settings?.username ?? "…"}</div>
-            <div className="muted small">Офлайн-аккаунт</div>
+            <div className="account-name">{activeAccount?.username ?? settings?.username ?? "…"}</div>
+            <div className="muted small">{activeAccount ? "Microsoft" : "Офлайн-аккаунт"}</div>
           </div>
         </div>
       </aside>

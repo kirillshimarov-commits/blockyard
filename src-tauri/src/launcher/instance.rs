@@ -80,6 +80,8 @@ pub struct Instance {
     #[serde(default)]
     pub shaders: Vec<InstalledMod>,
     #[serde(default)]
+    pub resourcepacks: Vec<InstalledMod>,
+    #[serde(default)]
     pub icon_url: Option<String>,
     #[serde(default)]
     pub modpack: Option<ModpackRef>,
@@ -99,8 +101,14 @@ impl Instance {
         self.game_dir().join("mods")
     }
 
-    pub fn shaderpacks_dir(&self) -> PathBuf {
-        self.game_dir().join("shaderpacks")
+    /// The tracked list for a game folder: "mods", "shaderpacks" or "resourcepacks".
+    pub fn list_mut(&mut self, folder: &str) -> Option<&mut Vec<InstalledMod>> {
+        match folder {
+            "mods" => Some(&mut self.mods),
+            "shaderpacks" => Some(&mut self.shaders),
+            "resourcepacks" => Some(&mut self.resourcepacks),
+            _ => None,
+        }
     }
 
     pub fn natives_dir(&self) -> PathBuf {
@@ -156,6 +164,7 @@ pub fn create(name: &str, game_version: &str, loader: Loader, memory_mb: u32) ->
         mods: Vec::new(),
         pending: Vec::new(),
         shaders: Vec::new(),
+        resourcepacks: Vec::new(),
         icon_url: None,
         modpack: None,
     };
@@ -172,23 +181,17 @@ pub fn delete(id: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn remove_mod(id: &str, project_id: &str) -> Result<Instance> {
+/// Removes a mod, shader or resource pack (by folder) and its file.
+pub fn remove_content(id: &str, folder: &str, project_id: &str) -> Result<Instance> {
     let mut instance = get(id)?;
-    if let Some(pos) = instance.mods.iter().position(|m| m.project_id == project_id) {
-        let removed = instance.mods.remove(pos);
-        let _ = std::fs::remove_file(instance.mods_dir().join(&removed.file_name));
+    let dir = instance.game_dir().join(folder);
+    if let Some(list) = instance.list_mut(folder) {
+        if let Some(pos) = list.iter().position(|m| m.project_id == project_id) {
+            let removed = list.remove(pos);
+            let _ = std::fs::remove_file(dir.join(&removed.file_name));
+        }
     }
     instance.pending.retain(|p| p.project_id != project_id);
     instance.save()?;
-    Ok(instance)
-}
-
-pub fn remove_shader(id: &str, project_id: &str) -> Result<Instance> {
-    let mut instance = get(id)?;
-    if let Some(pos) = instance.shaders.iter().position(|m| m.project_id == project_id) {
-        let removed = instance.shaders.remove(pos);
-        let _ = std::fs::remove_file(instance.shaderpacks_dir().join(&removed.file_name));
-        instance.save()?;
-    }
     Ok(instance)
 }

@@ -27,6 +27,12 @@
         },
         {
           "url": "https://www.curseforge.com/*"
+        },
+        {
+          "url": "https://www.microsoft.com/*"
+        },
+        {
+          "url": "https://microsoft.com/*"
         }
       ]
     }
