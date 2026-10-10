@@ -106,7 +106,19 @@ export default function InstanceView(props: Props) {
           </div>
         </div>
       )}
-      {state === "stopped" && status?.error && <div className="error-box">{status.error}</div>}
+      {state === "stopped" && status?.error && (
+        <div className="error-box crash-box">
+          <span className="grow">{status.error}</span>
+          {status.crashReport && (
+            <button
+              className="btn"
+              onClick={() => openPath(status.crashReport!).catch((e) => notify(errorText(e), true))}
+            >
+              Открыть отчёт о сбое
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="tabs">
         <button className={tab === "mods" ? "on" : ""} onClick={() => setTab("mods")}>

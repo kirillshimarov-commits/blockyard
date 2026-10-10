@@ -959,3 +959,12 @@ input[type="range"]::-webkit-slider-thumb {
   height: 100%;
   object-fit: cover;
 }
+
+.crash-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.crash-box .btn {
+  flex-shrink: 0;
+}

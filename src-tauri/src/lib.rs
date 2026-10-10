@@ -3,6 +3,7 @@ mod launcher;
 use crate::launcher::instance::{self, Instance, Loader};
 use crate::launcher::settings::{self, Settings};
 use crate::launcher::appearance;
+use crate::launcher::crash;
 use crate::launcher::mods::{self, ContentKind, Source};
 use crate::launcher::{curseforge, fabric, forge, launch, modpack, modrinth, mojang, Progress, Reporter};
 use serde::Serialize;
@@ -45,10 +46,32 @@ struct StateEvent {
     /// "installing" | "running" | "stopped"
     state: &'static str,
     error: Option<String>,
+    /// Crash report written by the game, if it crashed.
+    crash_report: Option<String>,
 }
 
 fn emit_state(app: &AppHandle, instance_id: &str, state: &'static str, error: Option<String>) {
-    let _ = app.emit("game-state", StateEvent { instance_id: instance_id.to_string(), state, error });
+    let _ = app.emit(
+        "game-state",
+        StateEvent { instance_id: instance_id.to_string(), state, error, crash_report: None },
+    );
+}
+
+fn emit_stopped(app: &AppHandle, instance_id: &str, result: anyhow::Result<()>) {
+    let (error, crash_report) = match result {
+        Ok(()) => (None, None),
+        Err(e) => {
+            let report = e
+                .downcast_ref::<crash::GameCrash>()
+                .and_then(|c| c.report.as_ref())
+                .map(|p| p.to_string_lossy().into_owned());
+            (Some(err(e)), report)
+        }
+    };
+    let _ = app.emit(
+        "game-state",
+        StateEvent { instance_id: instance_id.to_string(), state: "stopped", error, crash_report },
+    );
 }
 
 // ---------- Settings ----------
@@ -150,7 +173,7 @@ async fn launch_instance(app: AppHandle, id: String, running: State<'_, Running>
     tauri::async_runtime::spawn(async move {
         let result = run_game(&app2, &mut inst, &username, stop).await;
         app2.state::<Running>().0.lock().unwrap().remove(&inst.id);
-        emit_state(&app2, &inst.id, "stopped", result.err().map(err));
+        emit_stopped(&app2, &inst.id, result);
     });
     Ok(())
 }
@@ -167,6 +190,7 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, username: &str, stop: Ar
         p = launch::prepare(inst, username, &reporter) => p?,
         _ = stop.notified() => return Ok(()),
     };
+    let started = std::time::SystemTime::now();
     let mut child = launch::spawn(&prepared)?;
     launch::mark_played(inst)?;
     emit_state(app, &inst.id, "running", None);
@@ -190,7 +214,7 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, username: &str, stop: Ar
         status = child.wait() => {
             let status = status?;
             if !status.success() {
-                anyhow::bail!("Игра завершилась с ошибкой (код {}). Подробности в журнале.", status.code().unwrap_or(-1));
+                return Err(crash::describe(&prepared.game_dir, started, status.code().unwrap_or(-1)).into());
             }
         }
         _ = stop.notified() => {

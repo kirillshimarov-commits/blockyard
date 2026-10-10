@@ -93,6 +93,7 @@ export interface StateEvent {
   instanceId: string;
   state: GameState;
   error?: string | null;
+  crashReport?: string | null;
 }
 
 export interface LogEvent {

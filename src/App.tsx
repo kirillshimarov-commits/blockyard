@@ -25,6 +25,7 @@ export interface GameStatus {
   state: GameState;
   progress?: ProgressEvent;
   error?: string;
+  crashReport?: string;
 }
 
 const MAX_LOG_LINES = 3000;
@@ -97,12 +98,16 @@ export default function App() {
       listen<StateEvent>("game-state", ({ payload }) => {
         setStatus((s) => ({
           ...s,
-          [payload.instanceId]: { state: payload.state, error: payload.error ?? undefined },
+          [payload.instanceId]: {
+            state: payload.state,
+            error: payload.error ?? undefined,
+            crashReport: payload.crashReport ?? undefined,
+          },
         }));
         if (payload.state === "installing") setLogs((l) => ({ ...l, [payload.instanceId]: [] }));
         if (payload.state === "stopped") {
           refresh();
-          if (payload.error) notify(payload.error, true);
+          if (payload.error && !payload.crashReport) notify(payload.error, true);
         }
       }),
       listen<LogEvent>("game-log", ({ payload }) =>
