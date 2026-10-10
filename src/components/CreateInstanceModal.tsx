@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, errorText, FabricLoader, Instance, McVersion } from "../api";
+import { api, errorText, Instance, Loader, LOADER_NAMES, LoaderVersion, McVersion } from "../api";
 
 interface Props {
   onClose: () => void;
   onCreated: (inst: Instance) => void;
 }
 
+type LoaderChoice = Loader["type"];
+const LOADERS: LoaderChoice[] = ["fabric", "forge", "neoforge", "quilt", "vanilla"];
+
 export default function CreateInstanceModal({ onClose, onCreated }: Props) {
   const [versions, setVersions] = useState<McVersion[]>([]);
   const [showSnapshots, setShowSnapshots] = useState(false);
   const [gameVersion, setGameVersion] = useState("");
-  const [loaderType, setLoaderType] = useState<"fabric" | "vanilla">("fabric");
-  const [loaders, setLoaders] = useState<FabricLoader[]>([]);
+  const [loaderType, setLoaderType] = useState<LoaderChoice>("fabric");
+  const [loaders, setLoaders] = useState<LoaderVersion[]>([]);
+  const [loadingLoaders, setLoadingLoaders] = useState(false);
   const [loaderVersion, setLoaderVersion] = useState("");
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
@@ -30,36 +34,42 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
   }, []);
 
   useEffect(() => {
-    if (loaderType !== "fabric" || !gameVersion) return;
     setLoaders([]);
     setLoaderVersion("");
+    if (loaderType === "vanilla" || !gameVersion) return;
+    let cancelled = false;
+    setLoadingLoaders(true);
     api
-      .listFabricLoaders(gameVersion)
+      .listLoaderVersions(loaderType, gameVersion)
       .then((list) => {
+        if (cancelled) return;
         setLoaders(list);
-        setLoaderVersion((list.find((l) => l.stable) ?? list[0])?.version ?? "");
+        const pick = list.find((l) => l.recommended) ?? list.find((l) => l.stable) ?? list[0];
+        setLoaderVersion(pick?.version ?? "");
       })
-      .catch(() => setLoaders([]));
+      .catch(() => !cancelled && setLoaders([]))
+      .finally(() => !cancelled && setLoadingLoaders(false));
+    return () => {
+      cancelled = true;
+    };
   }, [gameVersion, loaderType]);
 
   useEffect(() => {
-    if (!nameTouched && gameVersion) {
-      setName(`${loaderType === "fabric" ? "Fabric" : "Vanilla"} ${gameVersion}`);
-    }
+    if (!nameTouched && gameVersion) setName(`${LOADER_NAMES[loaderType]} ${gameVersion}`);
   }, [gameVersion, loaderType, nameTouched]);
 
   const shown = useMemo(
     () => versions.filter((v) => v.type === "release" || (showSnapshots && v.type === "snapshot")),
     [versions, showSnapshots],
   );
-  const fabricUnavailable = loaderType === "fabric" && gameVersion !== "" && loaders.length === 0;
+  const needsLoader = loaderType !== "vanilla";
+  const unavailable = needsLoader && gameVersion !== "" && !loadingLoaders && loaders.length === 0;
 
   async function create() {
     setBusy(true);
     setError("");
     try {
-      const loader =
-        loaderType === "fabric" ? { type: "fabric" as const, version: loaderVersion } : { type: "vanilla" as const };
+      const loader: Loader = needsLoader ? { type: loaderType, version: loaderVersion } : { type: "vanilla" };
       onCreated(await api.createInstance(name, gameVersion, loader));
     } catch (e) {
       setError(errorText(e));
@@ -86,12 +96,11 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
         <div className="field">
           <span>Загрузчик модов</span>
           <div className="segmented">
-            <button className={loaderType === "fabric" ? "on" : ""} onClick={() => setLoaderType("fabric")}>
-              Fabric
-            </button>
-            <button className={loaderType === "vanilla" ? "on" : ""} onClick={() => setLoaderType("vanilla")}>
-              Vanilla (без модов)
-            </button>
+            {LOADERS.map((l) => (
+              <button key={l} className={loaderType === l ? "on" : ""} onClick={() => setLoaderType(l)}>
+                {LOADER_NAMES[l]}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -107,14 +116,15 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
               ))}
             </select>
           </label>
-          {loaderType === "fabric" && (
+          {needsLoader && (
             <label className="field grow">
-              <span>Версия Fabric</span>
+              <span>Версия {LOADER_NAMES[loaderType]}</span>
               <select value={loaderVersion} onChange={(e) => setLoaderVersion(e.target.value)} disabled={!loaders.length}>
+                {loadingLoaders && <option>Загрузка…</option>}
                 {loaders.map((l) => (
                   <option key={l.version} value={l.version}>
-                    {l.version}
-                    {l.stable ? "" : " (beta)"}
+                    {l.version.startsWith(`${gameVersion}-`) ? l.version.slice(gameVersion.length + 1) : l.version}
+                    {l.recommended ? " (рекомендуется)" : l.stable ? "" : " (beta)"}
                   </option>
                 ))}
               </select>
@@ -127,7 +137,12 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
           Показывать снапшоты
         </label>
 
-        {fabricUnavailable && <div className="hint">Fabric для этой версии не найден.</div>}
+        {unavailable && <div className="hint">{LOADER_NAMES[loaderType]} для этой версии не найден.</div>}
+        {(loaderType === "forge" || loaderType === "neoforge") && (
+          <p className="muted small">
+            Первый запуск сборки с {LOADER_NAMES[loaderType]} дольше обычного: лаунчер устанавливает загрузчик.
+          </p>
+        )}
         {error && <div className="error-box">{error}</div>}
 
         <div className="modal-actions">
@@ -136,7 +151,7 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
           </button>
           <button
             className="btn primary"
-            disabled={busy || !gameVersion || !name.trim() || (loaderType === "fabric" && !loaderVersion)}
+            disabled={busy || !gameVersion || !name.trim() || (needsLoader && !loaderVersion)}
             onClick={create}
           >
             Создать

@@ -13,6 +13,15 @@ pub enum Source {
     Curseforge,
 }
 
+/// What a catalog tab lists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ContentKind {
+    Mod,
+    Shader,
+    Modpack,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModHit {
@@ -47,6 +56,13 @@ pub struct PendingDownload {
     pub page_url: String,
     #[serde(default)]
     pub icon_url: Option<String>,
+    /// Folder inside the game directory: "mods", "shaderpacks" or "resourcepacks".
+    #[serde(default = "default_folder")]
+    pub folder: String,
+}
+
+fn default_folder() -> String {
+    "mods".into()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -57,6 +73,15 @@ pub struct InstallResult {
     pub installed: Vec<String>,
     /// Mods the user still has to download manually.
     pub pending: Vec<PendingDownload>,
+    /// Non-fatal problems worth showing to the user.
+    #[serde(default)]
+    pub warnings: Vec<String>,
+}
+
+impl InstallResult {
+    pub fn new(instance: Instance) -> Self {
+        Self { instance, installed: Vec::new(), pending: Vec::new(), warnings: Vec::new() }
+    }
 }
 
 /// Lowercase letters and digits only: "Fabric API" and "fabric-api" compare equal.
@@ -99,20 +124,31 @@ pub fn import_pending(instance_id: &str) -> Result<Instance> {
             still_pending.push(p);
             continue;
         }
-        let dest = inst.mods_dir().join(&p.file_name);
+        let folder = match p.folder.as_str() {
+            "shaderpacks" | "resourcepacks" => p.folder.as_str(),
+            _ => "mods",
+        };
+        let dest_dir = inst.game_dir().join(folder);
+        std::fs::create_dir_all(&dest_dir)?;
+        let dest = dest_dir.join(&p.file_name);
         if std::fs::rename(&src, &dest).is_err() {
             // Downloads may be on another drive.
             std::fs::copy(&src, &dest)?;
             let _ = std::fs::remove_file(&src);
         }
-        inst.mods.push(InstalledMod {
+        let entry = InstalledMod {
             source: p.source,
             project_id: p.project_id,
             version_id: p.version_id,
             title: p.title,
             file_name: p.file_name,
             icon_url: p.icon_url,
-        });
+        };
+        match folder {
+            "shaderpacks" => inst.shaders.push(entry),
+            "resourcepacks" => {}
+            _ => inst.mods.push(entry),
+        }
     }
     inst.pending = still_pending;
     inst.save()?;

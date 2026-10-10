@@ -2,7 +2,9 @@
 
 use super::instance::{Instance, Loader};
 use super::mojang::{self, ArgValue, Argument, AssetLayout, VersionJson};
-use super::{fabric, java, now, paths, report, Reporter};
+use super::fabric::{self, Flavor};
+use super::forge::{self, Kind};
+use super::{java, now, paths, report, Reporter};
 use anyhow::{Context, Result};
 use md5::{Digest, Md5};
 use std::collections::HashMap;
@@ -24,17 +26,21 @@ pub struct Prepared {
     pub game_dir: PathBuf,
 }
 
-async fn load_version(instance: &Instance) -> Result<VersionJson> {
+async fn load_version(instance: &Instance, reporter: &Reporter) -> Result<VersionJson> {
+    let game = &instance.game_version;
     match &instance.loader {
-        Loader::Vanilla => mojang::load_vanilla(&instance.game_version).await,
-        Loader::Fabric { version } => fabric::load(&instance.game_version, version).await,
+        Loader::Vanilla => mojang::load_vanilla(game).await,
+        Loader::Fabric { version } => fabric::load(Flavor::Fabric, game, version).await,
+        Loader::Quilt { version } => fabric::load(Flavor::Quilt, game, version).await,
+        Loader::Forge { version } => forge::load(Kind::Forge, game, version, reporter).await,
+        Loader::NeoForge { version } => forge::load(Kind::NeoForge, game, version, reporter).await,
     }
 }
 
 /// Downloads everything the instance needs and builds the java command line.
 pub async fn prepare(instance: &Instance, username: &str, reporter: &Reporter) -> Result<Prepared> {
     report(reporter, "Подготовка", 0, 1);
-    let version = load_version(instance).await.context("не удалось загрузить данные версии")?;
+    let version = load_version(instance, reporter).await.context("не удалось загрузить данные версии")?;
     let game_dir = instance.game_dir();
     let natives_dir = instance.natives_dir();
     std::fs::create_dir_all(&game_dir)?;

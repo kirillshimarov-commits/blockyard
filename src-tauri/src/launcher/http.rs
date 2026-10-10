@@ -57,6 +57,31 @@ fn is_valid(path: &Path, sha1: Option<&str>) -> bool {
     }
 }
 
+/// Maven repositories that mirror each other's Java libraries. Old Forge versions point at
+/// paths that only exist on one of them, so a failed library download is retried on the others.
+const MAVEN_MIRRORS: &[&str] = &[
+    "https://maven.minecraftforge.net/",
+    "https://libraries.minecraft.net/",
+    "https://repo1.maven.org/maven2/",
+];
+
+fn candidate_urls(url: &str) -> Vec<String> {
+    let mut urls = vec![url.to_string()];
+    if let Some(rest) = MAVEN_MIRRORS.iter().find_map(|m| url.strip_prefix(m)) {
+        urls.extend(MAVEN_MIRRORS.iter().map(|m| format!("{m}{rest}")).filter(|u| u != url));
+    }
+    urls
+}
+
+async fn fetch(url: &str) -> Result<reqwest::Response> {
+    Ok(client()
+        .get(url)
+        .send()
+        .await
+        .with_context(|| format!("download of {url} failed"))?
+        .error_for_status()?)
+}
+
 pub async fn download(dl: &Download) -> Result<()> {
     if is_valid(&dl.path, dl.sha1.as_deref()) {
         return Ok(());
@@ -65,12 +90,20 @@ pub async fn download(dl: &Download) -> Result<()> {
         tokio::fs::create_dir_all(parent).await?;
     }
 
-    let resp = client()
-        .get(&dl.url)
-        .send()
-        .await
-        .with_context(|| format!("download of {} failed", dl.url))?
-        .error_for_status()?;
+    let mut last_error = None;
+    let mut response = None;
+    for url in candidate_urls(&dl.url) {
+        match fetch(&url).await {
+            Ok(r) => {
+                response = Some(r);
+                break;
+            }
+            Err(e) => last_error = Some(e),
+        }
+    }
+    let Some(resp) = response else {
+        return Err(last_error.unwrap_or_else(|| anyhow::anyhow!("download of {} failed", dl.url)));
+    };
 
     // Write to a temp file first so an interrupted download never looks complete.
     let tmp = dl.path.with_extension("part");

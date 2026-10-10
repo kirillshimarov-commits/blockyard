@@ -3,8 +3,8 @@ mod launcher;
 use crate::launcher::instance::{self, Instance, Loader};
 use crate::launcher::settings::{self, Settings};
 use crate::launcher::appearance;
-use crate::launcher::mods::{self, Source};
-use crate::launcher::{curseforge, fabric, launch, modrinth, mojang, Progress, Reporter};
+use crate::launcher::mods::{self, ContentKind, Source};
+use crate::launcher::{curseforge, fabric, forge, launch, modpack, modrinth, mojang, Progress, Reporter};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -74,8 +74,16 @@ async fn list_versions() -> CmdResult<Vec<mojang::ManifestEntry>> {
 }
 
 #[tauri::command]
-async fn list_fabric_loaders(game_version: String) -> CmdResult<Vec<fabric::LoaderVersion>> {
-    fabric::loader_versions(&game_version).await.map_err(err)
+async fn list_loader_versions(loader: String, game_version: String) -> CmdResult<Vec<fabric::LoaderVersion>> {
+    let g = &game_version;
+    match loader.as_str() {
+        "fabric" => fabric::loader_versions(fabric::Flavor::Fabric, g).await,
+        "quilt" => fabric::loader_versions(fabric::Flavor::Quilt, g).await,
+        "forge" => forge::loader_versions(forge::Kind::Forge, g).await,
+        "neoforge" => forge::loader_versions(forge::Kind::NeoForge, g).await,
+        other => return Err(format!("неизвестный загрузчик {other}")),
+    }
+    .map_err(err)
 }
 
 // ---------- Instances ----------
@@ -208,6 +216,7 @@ fn curseforge_available() -> bool {
 
 #[tauri::command]
 async fn search_mods(
+    kind: ContentKind,
     source: Source,
     query: String,
     game_version: Option<String>,
@@ -217,8 +226,8 @@ async fn search_mods(
 ) -> CmdResult<mods::SearchResult> {
     let (q, v, l) = (&query, game_version.as_deref(), loader.as_deref());
     match source {
-        Source::Modrinth => modrinth::search(q, v, l, &sort, offset).await,
-        Source::Curseforge => curseforge::search(q, v, l, &sort, offset).await,
+        Source::Modrinth => modrinth::search(kind, q, v, l, &sort, offset).await,
+        Source::Curseforge => curseforge::search(kind, q, v, l, &sort, offset).await,
     }
     .map_err(err)
 }
@@ -230,6 +239,53 @@ async fn install_mod(instance_id: String, source: Source, project_id: String) ->
         Source::Curseforge => curseforge::install(&instance_id, &project_id).await,
     }
     .map_err(err)
+}
+
+#[tauri::command]
+async fn install_shader(instance_id: String, source: Source, project_id: String) -> CmdResult<mods::InstallResult> {
+    match source {
+        Source::Modrinth => modrinth::install_shader(&instance_id, &project_id).await,
+        Source::Curseforge => curseforge::install_shader(&instance_id, &project_id).await,
+    }
+    .map_err(err)
+}
+
+#[tauri::command]
+fn remove_shader(instance_id: String, project_id: String) -> CmdResult<Instance> {
+    instance::remove_shader(&instance_id, &project_id).map_err(err)
+}
+
+/// Creates an instance for the modpack right away and installs it in the background,
+/// reporting progress like a game launch.
+#[tauri::command]
+async fn install_modpack(
+    app: AppHandle,
+    source: Source,
+    project_id: String,
+    running: State<'_, Running>,
+) -> CmdResult<Instance> {
+    let (inst, plan) = modpack::prepare(source, &project_id, settings::load().memory_mb).await.map_err(err)?;
+    let stop = Arc::new(Notify::new());
+    running.0.lock().unwrap().insert(inst.id.clone(), stop.clone());
+    emit_state(&app, &inst.id, "installing", None);
+
+    let app2 = app.clone();
+    let id = inst.id.clone();
+    tauri::async_runtime::spawn(async move {
+        let app_for_progress = app2.clone();
+        let id_for_progress = id.clone();
+        let reporter: Reporter = Arc::new(move |progress| {
+            let _ = app_for_progress
+                .emit("launch-progress", ProgressEvent { instance_id: id_for_progress.clone(), progress });
+        });
+        let result = tokio::select! {
+            r = modpack::finish(&id, plan, &reporter) => r.map(|_| ()),
+            _ = stop.notified() => Err(anyhow::anyhow!("Установка модпака отменена")),
+        };
+        app2.state::<Running>().0.lock().unwrap().remove(&id);
+        emit_state(&app2, &id, "stopped", result.err().map(err));
+    });
+    Ok(inst)
 }
 
 /// Picks up mods the user downloaded manually from the Downloads folder.
@@ -314,7 +370,7 @@ pub fn run() {
             get_settings,
             save_settings,
             list_versions,
-            list_fabric_loaders,
+            list_loader_versions,
             list_instances,
             get_instance,
             create_instance,
@@ -328,6 +384,9 @@ pub fn run() {
             search_mods,
             install_mod,
             import_pending_mods,
+            install_shader,
+            remove_shader,
+            install_modpack,
             get_appearance,
             save_appearance,
             set_window_style,

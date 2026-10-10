@@ -252,10 +252,14 @@ pub struct ResolvedLibrary {
 }
 
 pub fn resolve_libraries(version: &VersionJson) -> Vec<ResolvedLibrary> {
+    resolve_library_list(&version.libraries)
+}
+
+pub fn resolve_library_list(libraries: &[Library]) -> Vec<ResolvedLibrary> {
     let libs_dir = paths::libraries_dir();
     let mut out = Vec::new();
 
-    for lib in &version.libraries {
+    for lib in libraries {
         if !rules_allow(lib.rules.as_deref().unwrap_or(&[])) {
             continue;
         }

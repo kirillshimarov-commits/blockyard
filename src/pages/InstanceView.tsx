@@ -4,6 +4,7 @@ import { api, errorText, Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
+import InstanceCover from "../components/InstanceCover";
 
 interface Props {
   instance?: Instance;
@@ -11,13 +12,13 @@ interface Props {
   logs: string[];
   onPlay: () => void;
   onStop: () => void;
-  onBrowse: () => void;
+  onBrowse: (content: "mod" | "shader") => void;
   onChanged: (inst: Instance) => void;
   onDeleted: () => void;
   notify: (text: string, error?: boolean) => void;
 }
 
-type Tab = "mods" | "log" | "options";
+type Tab = "mods" | "shaders" | "log" | "options";
 
 export default function InstanceView(props: Props) {
   const { instance, status, logs, onPlay, onStop, onBrowse, onChanged, onDeleted, notify } = props;
@@ -37,7 +38,7 @@ export default function InstanceView(props: Props) {
   }, [logs, tab]);
 
   if (!instance) return <div className="page muted">Сборка не найдена</div>;
-  const isFabric = instance.loader.type === "fabric";
+  const hasLoader = instance.loader.type !== "vanilla";
   const progress = status?.progress;
   const percent = progress && progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : null;
 
@@ -70,13 +71,12 @@ export default function InstanceView(props: Props) {
   return (
     <div className="page">
       <header className="instance-header">
-        <div className="instance-cover large">
-          <span>{instance.name.slice(0, 1).toUpperCase()}</span>
-        </div>
+        <InstanceCover instance={instance} large />
         <div className="grow">
           <h1>{instance.name}</h1>
           <p className="muted">
             Minecraft {instance.gameVersion} · {loaderLabel(instance.loader)} · {instance.memoryMb} МБ ОЗУ
+            {instance.modpack ? ` · модпак «${instance.modpack.title}»` : ""}
           </p>
         </div>
         <button className="btn icon" title="Открыть папку" onClick={openFolder}>
@@ -112,6 +112,9 @@ export default function InstanceView(props: Props) {
         <button className={tab === "mods" ? "on" : ""} onClick={() => setTab("mods")}>
           Моды {instance.mods.length > 0 && <span className="badge">{instance.mods.length}</span>}
         </button>
+        <button className={tab === "shaders" ? "on" : ""} onClick={() => setTab("shaders")}>
+          Шейдеры {instance.shaders.length > 0 && <span className="badge">{instance.shaders.length}</span>}
+        </button>
         <button className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>
           Журнал
         </button>
@@ -121,9 +124,9 @@ export default function InstanceView(props: Props) {
       </div>
 
       {tab === "mods" &&
-        (!isFabric ? (
+        (!hasLoader ? (
           <div className="empty small">
-            <p className="muted">Это ванильная сборка. Чтобы ставить моды, создайте сборку с Fabric.</p>
+            <p className="muted">Это ванильная сборка. Чтобы ставить моды, создайте сборку с Fabric, Forge или NeoForge.</p>
           </div>
         ) : (
           <>
@@ -137,7 +140,7 @@ export default function InstanceView(props: Props) {
             )}
             <div className="row between">
               <span className="muted">{instance.mods.length ? "Установленные моды" : "Модов пока нет"}</span>
-              <button className="btn primary" onClick={onBrowse}>
+              <button className="btn primary" onClick={() => onBrowse("mod")}>
                 <Icon name="plus" /> Добавить моды
               </button>
             </div>
@@ -159,6 +162,50 @@ export default function InstanceView(props: Props) {
                     title="Удалить"
                     disabled={state !== "stopped"}
                     onClick={() => removeMod(m.projectId)}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        ))}
+
+      {tab === "shaders" &&
+        (!hasLoader ? (
+          <div className="empty small">
+            <p className="muted">Для шейдеров нужна сборка с Fabric, Forge, NeoForge или Quilt.</p>
+          </div>
+        ) : (
+          <>
+            <div className="row between">
+              <span className="muted">
+                {instance.shaders.length
+                  ? "Включить шейдер: в игре Настройки → Графика → Наборы шейдеров"
+                  : "Шейдеров пока нет"}
+              </span>
+              <button className="btn primary" onClick={() => onBrowse("shader")}>
+                <Icon name="plus" /> Добавить шейдеры
+              </button>
+            </div>
+            <div className="mod-list">
+              {instance.shaders.map((m) => (
+                <div key={m.projectId} className="mod-row">
+                  {m.iconUrl ? <img src={m.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
+                  <div className="grow">
+                    <div className="mod-title">{m.title}</div>
+                    <div className="muted small">{m.fileName}</div>
+                  </div>
+                  <button
+                    className="btn icon"
+                    title="Удалить"
+                    disabled={state !== "stopped"}
+                    onClick={() =>
+                      api
+                        .removeShader(instance.id, m.projectId)
+                        .then(onChanged)
+                        .catch((e) => notify(errorText(e), true))
+                    }
                   >
                     <Icon name="trash" />
                   </button>

@@ -3,6 +3,7 @@ import { Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
 import CreateInstanceModal from "../components/CreateInstanceModal";
 import { Icon } from "../components/Icon";
+import InstanceCover from "../components/InstanceCover";
 
 interface Props {
   instances: Instance[];
@@ -43,15 +44,19 @@ export default function Library({ instances, status, onOpen, onPlay, onCreated }
             const state = status[inst.id]?.state ?? "stopped";
             return (
               <div key={inst.id} className="instance-card" onClick={() => onOpen(inst.id)}>
-                <div className="instance-cover">
-                  <span>{inst.name.slice(0, 1).toUpperCase()}</span>
-                </div>
+                <InstanceCover instance={inst} />
                 <div className="instance-info">
                   <div className="instance-name truncate">{inst.name}</div>
                   <div className="muted small">
                     {inst.gameVersion} · {loaderLabel(inst.loader)}
                   </div>
-                  <div className="muted small">{inst.mods.length ? `${inst.mods.length} модов` : "Без модов"}</div>
+                  <div className="muted small">
+                    {status[inst.id]?.state === "installing"
+                      ? "Установка…"
+                      : inst.mods.length
+                        ? `${inst.mods.length} модов`
+                        : "Без модов"}
+                  </div>
                 </div>
                 <button
                   className="play-fab"

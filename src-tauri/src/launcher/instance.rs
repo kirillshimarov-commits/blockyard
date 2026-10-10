@@ -11,6 +11,9 @@ use std::path::PathBuf;
 pub enum Loader {
     Vanilla,
     Fabric { version: String },
+    Quilt { version: String },
+    Forge { version: String },
+    NeoForge { version: String },
 }
 
 impl Loader {
@@ -19,8 +22,30 @@ impl Loader {
         match self {
             Loader::Vanilla => None,
             Loader::Fabric { .. } => Some("fabric"),
+            Loader::Quilt { .. } => Some("quilt"),
+            Loader::Forge { .. } => Some("forge"),
+            Loader::NeoForge { .. } => Some("neoforge"),
         }
     }
+
+    /// Modrinth slug of the mod that loads shader packs on this loader.
+    pub fn shader_mod(&self) -> Option<&'static str> {
+        match self {
+            Loader::Vanilla => None,
+            Loader::Forge { .. } => Some("oculus"),
+            _ => Some("iris"),
+        }
+    }
+}
+
+/// The modpack an instance was created from.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackRef {
+    pub source: Source,
+    pub project_id: String,
+    pub version_id: String,
+    pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +77,12 @@ pub struct Instance {
     /// Mods waiting for the user to download them in the browser.
     #[serde(default)]
     pub pending: Vec<PendingDownload>,
+    #[serde(default)]
+    pub shaders: Vec<InstalledMod>,
+    #[serde(default)]
+    pub icon_url: Option<String>,
+    #[serde(default)]
+    pub modpack: Option<ModpackRef>,
 }
 
 impl Instance {
@@ -66,6 +97,10 @@ impl Instance {
 
     pub fn mods_dir(&self) -> PathBuf {
         self.game_dir().join("mods")
+    }
+
+    pub fn shaderpacks_dir(&self) -> PathBuf {
+        self.game_dir().join("shaderpacks")
     }
 
     pub fn natives_dir(&self) -> PathBuf {
@@ -120,6 +155,9 @@ pub fn create(name: &str, game_version: &str, loader: Loader, memory_mb: u32) ->
         last_played: None,
         mods: Vec::new(),
         pending: Vec::new(),
+        shaders: Vec::new(),
+        icon_url: None,
+        modpack: None,
     };
     instance.save()?;
     Ok(instance)
@@ -142,5 +180,15 @@ pub fn remove_mod(id: &str, project_id: &str) -> Result<Instance> {
     }
     instance.pending.retain(|p| p.project_id != project_id);
     instance.save()?;
+    Ok(instance)
+}
+
+pub fn remove_shader(id: &str, project_id: &str) -> Result<Instance> {
+    let mut instance = get(id)?;
+    if let Some(pos) = instance.shaders.iter().position(|m| m.project_id == project_id) {
+        let removed = instance.shaders.remove(pos);
+        let _ = std::fs::remove_file(instance.shaderpacks_dir().join(&removed.file_name));
+        instance.save()?;
+    }
     Ok(instance)
 }

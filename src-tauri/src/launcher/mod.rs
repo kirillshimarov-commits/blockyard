@@ -3,11 +3,13 @@
 pub mod appearance;
 pub mod curseforge;
 pub mod fabric;
+pub mod forge;
 pub mod http;
 pub mod instance;
 pub mod java;
 pub mod launch;
 pub mod modrinth;
+pub mod modpack;
 pub mod mods;
 pub mod mojang;
 pub mod paths;

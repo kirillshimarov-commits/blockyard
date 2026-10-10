@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
+import { api, ContentKind, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
 import Library from "./pages/Library";
 import InstanceView from "./pages/InstanceView";
 import Browse from "./pages/Browse";
 import SettingsPage from "./pages/Settings";
-import { Icon } from "./components/Icon";
+import { Icon, IconName } from "./components/Icon";
 import {
   Appearance,
   applyAppearance,
@@ -18,7 +18,7 @@ import {
 export type View =
   | { kind: "library" }
   | { kind: "instance"; id: string }
-  | { kind: "browse"; instanceId?: string }
+  | { kind: "browse"; content: ContentKind; instanceId?: string }
   | { kind: "settings" };
 
 export interface GameStatus {
@@ -128,12 +128,14 @@ export default function App() {
     [notify],
   );
 
-  const nav = [
-    { kind: "library" as const, label: "Библиотека", icon: "grid" as const },
-    { kind: "browse" as const, label: "Моды", icon: "search" as const },
-    { kind: "settings" as const, label: "Настройки", icon: "gear" as const },
+  const nav: { key: string; view: View; label: string; icon: IconName }[] = [
+    { key: "library", view: { kind: "library" }, label: "Библиотека", icon: "grid" },
+    { key: "mod", view: { kind: "browse", content: "mod" }, label: "Моды", icon: "puzzle" },
+    { key: "shader", view: { kind: "browse", content: "shader" }, label: "Шейдеры", icon: "sun" },
+    { key: "modpack", view: { kind: "browse", content: "modpack" }, label: "Готовые сборки", icon: "layers" },
+    { key: "settings", view: { kind: "settings" }, label: "Настройки", icon: "gear" },
   ];
-  const active = view.kind === "instance" ? "library" : view.kind;
+  const active = view.kind === "instance" ? "library" : view.kind === "browse" ? view.content : view.kind;
 
   return (
     <div className="app">
@@ -146,9 +148,10 @@ export default function App() {
         <nav>
           {nav.map((item) => (
             <button
-              key={item.kind}
-              className={`nav-item ${active === item.kind ? "active" : ""}`}
-              onClick={() => setView({ kind: item.kind } as View)}
+              key={item.key}
+              className={`nav-item ${active === item.key ? "active" : ""}`}
+              title={item.label}
+              onClick={() => setView(item.view)}
             >
               <Icon name={item.icon} />
               <span className="nav-label">{item.label}</span>
@@ -201,7 +204,7 @@ export default function App() {
             logs={logs[view.id] ?? []}
             onPlay={() => play(view.id)}
             onStop={() => api.stop(view.id)}
-            onBrowse={() => setView({ kind: "browse", instanceId: view.id })}
+            onBrowse={(content) => setView({ kind: "browse", content, instanceId: view.id })}
             onChanged={updateInstance}
             onDeleted={() => {
               refresh();
@@ -212,9 +215,15 @@ export default function App() {
         )}
         {view.kind === "browse" && (
           <Browse
+            key={view.content}
+            kind={view.content}
             instances={instances}
             initialInstanceId={view.instanceId}
             onChanged={updateInstance}
+            onCreated={(inst) => {
+              setInstances((list) => [inst, ...list]);
+              setView({ kind: "instance", id: inst.id });
+            }}
             onOpenInstance={(id) => setView({ kind: "instance", id })}
             notify={notify}
           />
