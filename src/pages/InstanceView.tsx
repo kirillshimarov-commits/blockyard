@@ -24,13 +24,22 @@ export default function InstanceView(props: Props) {
   const { instance, status, logs, onPlay, onStop, onBrowse, onChanged, onDeleted, notify } = props;
   const [tab, setTab] = useState<Tab>("mods");
   const [showPending, setShowPending] = useState(false);
+  const [playAfterPending, setPlayAfterPending] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
+  const prevState = useRef<string | undefined>(undefined);
   const state = status?.state ?? "stopped";
+  const pendingCount = instance?.pending.length ?? 0;
 
   useEffect(() => {
     if (state === "installing") setTab("log");
-  }, [state]);
+    // A modpack just finished installing but some mods need a manual download.
+    if (prevState.current === "installing" && state === "stopped" && !status?.error && pendingCount > 0) {
+      setTab("mods");
+      setShowPending(true);
+    }
+    prevState.current = state;
+  }, [state, status?.error, pendingCount]);
 
   useEffect(() => {
     const el = logRef.current;
@@ -83,7 +92,18 @@ export default function InstanceView(props: Props) {
           <Icon name="folder" />
         </button>
         {state === "stopped" ? (
-          <button className="btn primary big" onClick={onPlay}>
+          <button
+            className="btn primary big"
+            onClick={() => {
+              // Launching without required mods usually ends in a crash; offer the downloads first.
+              if (instance.pending.length > 0) {
+                setPlayAfterPending(true);
+                setShowPending(true);
+              } else {
+                onPlay();
+              }
+            }}
+          >
             <Icon name="play" /> Играть
           </button>
         ) : (
@@ -228,7 +248,23 @@ export default function InstanceView(props: Props) {
         ))}
 
       {showPending && (
-        <PendingDownloadsModal instance={instance} onChanged={onChanged} onClose={() => setShowPending(false)} />
+        <PendingDownloadsModal
+          instance={instance}
+          onChanged={onChanged}
+          onClose={() => {
+            setShowPending(false);
+            setPlayAfterPending(false);
+          }}
+          onPlay={
+            playAfterPending
+              ? () => {
+                  setShowPending(false);
+                  setPlayAfterPending(false);
+                  onPlay();
+                }
+              : undefined
+          }
+        />
       )}
 
       {tab === "log" && (

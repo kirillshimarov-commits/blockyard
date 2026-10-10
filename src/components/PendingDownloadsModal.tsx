@@ -7,12 +7,14 @@ interface Props {
   instance: Instance;
   onChanged: (inst: Instance) => void;
   onClose: () => void;
+  /** Set when the modal was opened from the Play button. */
+  onPlay?: () => void;
 }
 
 const POLL_MS = 2000;
 
 /** Mods whose authors forbid launcher downloads: the user grabs them in the browser, we pick them up. */
-export default function PendingDownloadsModal({ instance, onChanged, onClose }: Props) {
+export default function PendingDownloadsModal({ instance, onChanged, onClose, onPlay }: Props) {
   const pending = instance.pending;
 
   useEffect(() => {
@@ -33,6 +35,9 @@ export default function PendingDownloadsModal({ instance, onChanged, onClose }: 
         <h2>{pending.length ? "Нужно скачать вручную" : "Готово!"}</h2>
         {pending.length > 0 ? (
           <>
+            {onPlay && (
+              <div className="warning-box">Без этих модов игра, скорее всего, вылетит.</div>
+            )}
             <p className="muted">
               Авторы этих модов запретили скачивание через лаунчеры. Нажмите «Скачать» и сохраните файл в папку
               «Загрузки», а лаунчер сам перенесёт его в сборку.
@@ -59,9 +64,20 @@ export default function PendingDownloadsModal({ instance, onChanged, onClose }: 
           <p className="muted">Все моды перенесены в сборку.</p>
         )}
         <div className="modal-actions">
-          <button className={`btn ${pending.length ? "" : "primary"}`} onClick={onClose}>
-            {pending.length ? "Скачаю позже" : "Закрыть"}
-          </button>
+          {onPlay ? (
+            <>
+              <button className="btn" onClick={onClose}>
+                Отмена
+              </button>
+              <button className={`btn ${pending.length ? "danger" : "primary"}`} onClick={onPlay}>
+                {pending.length ? "Играть без них" : "Играть"}
+              </button>
+            </>
+          ) : (
+            <button className={`btn ${pending.length ? "" : "primary"}`} onClick={onClose}>
+              {pending.length ? "Скачаю позже" : "Закрыть"}
+            </button>
+          )}
         </div>
       </div>
     </div>

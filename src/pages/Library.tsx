@@ -14,7 +14,7 @@ interface Props {
   notify: (text: string, error?: boolean) => void;
 }
 
-export default function Library({ instances, status, onOpen, onPlay, onCreated }: Props) {
+export default function Library({ instances, status, onOpen, onPlay, onCreated, notify }: Props) {
   const [creating, setCreating] = useState(false);
 
   return (
@@ -64,7 +64,12 @@ export default function Library({ instances, status, onOpen, onPlay, onCreated }
                   title="Играть"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onPlay(inst.id);
+                    if (inst.pending.length > 0) {
+                      notify(`В сборке не хватает модов (${inst.pending.length}) — скачайте их перед игрой`, true);
+                      onOpen(inst.id);
+                    } else {
+                      onPlay(inst.id);
+                    }
                   }}
                 >
                   {state === "stopped" ? <Icon name="play" /> : <span className="spinner" />}
