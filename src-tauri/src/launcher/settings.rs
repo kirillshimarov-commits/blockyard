@@ -11,11 +11,13 @@ pub struct Settings {
     pub memory_mb: u32,
     /// UUID of the Microsoft account to play with; offline when empty.
     pub active_account: Option<String>,
+    /// Show the game inside the launcher window instead of a separate one (Windows).
+    pub embed_game: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { username: "Player".into(), memory_mb: 4096, active_account: None }
+        Self { username: "Player".into(), memory_mb: 4096, active_account: None, embed_game: true }
     }
 }
 

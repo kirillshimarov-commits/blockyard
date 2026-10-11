@@ -66,6 +66,8 @@ export default function App() {
   const [tunnel, setTunnel] = useState<TunnelStatus>({ lanPorts: {} });
   const [joining, setJoining] = useState(false);
   const [launching, setLaunching] = useState<string | null>(null);
+  /** Instances whose game window is already inside the launcher window. */
+  const [embedded, setEmbedded] = useState<Record<string, boolean>>({});
   /** null until the appearance is loaded, so the intro does not flash for people who turned it off. */
   const [splash, setSplash] = useState<boolean | null>(null);
   const hideSplash = useCallback(() => setSplash(false), []);
@@ -177,11 +179,13 @@ export default function App() {
           },
         }));
         if (payload.state === "installing") setLogs((l) => ({ ...l, [payload.instanceId]: [] }));
+        if (payload.state !== "running") setEmbedded((m) => ({ ...m, [payload.instanceId]: false }));
         if (payload.state === "stopped") {
           refresh();
           if (payload.error && !payload.crashReport) notify(payload.error, true);
         }
       }),
+      listen<string>("game-embedded", ({ payload }) => setEmbedded((m) => ({ ...m, [payload]: true }))),
       listen<LogEvent>("game-log", ({ payload }) =>
         setLogs((l) => {
           const lines = [...(l[payload.instanceId] ?? []), payload.line];
@@ -467,7 +471,17 @@ export default function App() {
       )}
 
       {consoleLayout && launchingInstance && (
-        <LaunchOverlay instance={launchingInstance} status={status[launchingInstance.id]} onClose={hideLaunch} />
+        <LaunchOverlay
+          instance={launchingInstance}
+          status={status[launchingInstance.id]}
+          waitForWindow={
+            (settings?.embedGame ?? true) &&
+            !launchingInstance.settings.fullscreen &&
+            !launchingInstance.settings.wrapper?.trim()
+          }
+          embedded={!!embedded[launchingInstance.id]}
+          onClose={hideLaunch}
+        />
       )}
       {splash && <Splash name={activeAccount?.username ?? settings?.username ?? ""} onDone={hideSplash} />}
 

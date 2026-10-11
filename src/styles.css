@@ -1504,16 +1504,22 @@ textarea:focus {
 }
 .topbar-tabs {
   display: flex;
-  gap: 4px;
+  gap: 2px;
+  padding: 4px;
   overflow-x: auto;
   scrollbar-width: none;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.05);
+  backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 6px 24px rgb(0 0 0 / 0.25);
 }
 .tab-pill {
   padding: 7px 16px;
   border: 0;
   border-radius: 999px;
   background: none;
-  color: var(--muted);
+  color: rgb(255 255 255 / 0.72);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -1534,8 +1540,14 @@ textarea:focus {
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex-shrink: 0;
+  padding: 4px 14px 4px 4px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.05);
+  backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 6px 24px rgb(0 0 0 / 0.25);
 }
 .icon-btn {
   width: 36px;
@@ -1645,7 +1657,8 @@ button.status-chip {
   overflow-x: hidden;
   overflow-y: auto;
 }
-.home > :not(.hero-backdrop) {
+/* Above the backdrop; modals keep their fixed position. */
+.home > :not(.hero-backdrop):not(.modal-backdrop) {
   position: relative;
 }
 .home-welcome {
@@ -1655,8 +1668,11 @@ button.status-chip {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
   min-height: 116px;
-  padding: 10px 28px;
+  /* Room for the selected tile's glow: the scroll container would clip it otherwise. */
+  padding: 26px 28px 52px;
+  margin: -16px 0 -42px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1738,6 +1754,7 @@ button.status-chip {
 }
 
 .tile-caption {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2387,4 +2404,20 @@ button.status-chip {
 }
 .skeleton.line.short {
   width: 60%;
+}
+
+/* Native dropdown lists: dark popup with readable text. */
+select {
+  color-scheme: dark;
+}
+:root[data-theme="light"]:not([data-space="true"]) select {
+  color-scheme: light;
+}
+select option {
+  background: rgb(var(--surface));
+  color: var(--text);
+}
+:root[data-space="true"] select option {
+  background: #1b1930;
+  color: #f1effa;
 }

@@ -7,23 +7,35 @@ import InstanceCover from "./InstanceCover";
 export default function LaunchOverlay({
   instance,
   status,
+  waitForWindow,
+  embedded,
   onClose,
 }: {
   instance: Instance;
   status?: GameStatus;
+  /** The game will appear inside the launcher: stay until its window is there. */
+  waitForWindow: boolean;
+  embedded: boolean;
   onClose: () => void;
 }) {
   const [leaving, setLeaving] = useState(false);
   const state = status?.state ?? "installing";
   const progress = status?.progress;
 
+  const loadingGame = state === "running" && waitForWindow && !embedded;
+
   useEffect(() => {
     if (state === "installing") return;
+    if (loadingGame) {
+      // Never hang on this screen if the window cannot be embedded for some reason.
+      const t = window.setTimeout(onClose, 180_000);
+      return () => window.clearTimeout(t);
+    }
     // Running: let the player see that it worked. Stopped: an error toast or crash card takes over.
     setLeaving(true);
-    const t = window.setTimeout(onClose, state === "running" ? 1400 : 400);
+    const t = window.setTimeout(onClose, state === "running" && !embedded ? 1400 : 400);
     return () => window.clearTimeout(t);
-  }, [state, onClose]);
+  }, [state, loadingGame, embedded, onClose]);
 
   const percent = progress?.total ? Math.round((progress.current / progress.total) * 100) : null;
 
@@ -34,12 +46,16 @@ export default function LaunchOverlay({
       </div>
       <div className="launch-title">{instance.name}</div>
       <div className="launch-stage">
-        {state === "running" ? "Приятной игры!" : (progress?.stage ?? "Подготовка к запуску…")}
+        {loadingGame
+          ? "Загружаем игру…"
+          : state === "running"
+            ? "Приятной игры!"
+            : (progress?.stage ?? "Подготовка к запуску…")}
       </div>
       <div className="launch-bar">
         <div
-          className={percent === null ? "indeterminate" : ""}
-          style={percent === null ? undefined : { width: `${percent}%` }}
+          className={percent === null || loadingGame ? "indeterminate" : ""}
+          style={percent === null || loadingGame ? undefined : { width: `${percent}%` }}
         />
       </div>
       <button className="link muted small" onClick={onClose}>

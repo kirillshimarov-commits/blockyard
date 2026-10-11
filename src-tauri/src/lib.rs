@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::window::{Effect, EffectsBuilder};
-use tauri::{AppHandle, Emitter, Manager, State, Theme, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, Theme, WebviewWindow, WindowEvent};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::Notify;
 
@@ -249,6 +249,18 @@ async fn run_game(
     let mut child = launch::spawn(&prepared)?;
     launch::mark_played(inst)?;
     emit_state(app, &inst.id, "running", None);
+
+    // Fullscreen and wrapped launches keep their own window: a wrapper's PID is not the game's.
+    let embed = settings::load().embed_game && !inst.settings.fullscreen && inst.settings.wrapper.trim().is_empty();
+    if let (true, Some(pid), Some(parent)) = (embed, child.id(), main_hwnd(app)) {
+        let app = app.clone();
+        let instance_id = inst.id.clone();
+        tauri::async_runtime::spawn(async move {
+            if launcher::embed::embed_when_ready(pid, parent).await {
+                let _ = app.emit("game-embedded", instance_id);
+            }
+        });
+    }
 
     // The last lines of output, for crash analysis when there is no crash report.
     let log_tail: Arc<Mutex<std::collections::VecDeque<String>>> = Arc::default();
@@ -710,6 +722,19 @@ fn apply_window_style(window: &WebviewWindow, effect: &str, theme: &str) -> &'st
     }
 }
 
+/// Raw handle of the launcher window, for embedding the game into it.
+fn main_hwnd(app: &AppHandle) -> Option<isize> {
+    #[cfg(windows)]
+    {
+        app.get_webview_window("main")?.hwnd().ok().map(|h| h.0 as isize)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        None
+    }
+}
+
 #[tauri::command]
 fn set_window_style(window: WebviewWindow, effect: String, theme: String) -> &'static str {
     apply_window_style(&window, &effect, &theme)
@@ -732,6 +757,17 @@ pub fn run() {
                     appearance::field(&saved, "theme", "system"),
                 );
                 window.show()?;
+                // Keep an embedded game filling the window and receiving the keyboard.
+                let handle = app.handle().clone();
+                window.on_window_event(move |event| match event {
+                    WindowEvent::Resized(_) => {
+                        if let Some(parent) = main_hwnd(&handle) {
+                            launcher::embed::resize_all(parent);
+                        }
+                    }
+                    WindowEvent::Focused(true) => launcher::embed::focus(),
+                    _ => {}
+                });
             }
             Ok(())
         })

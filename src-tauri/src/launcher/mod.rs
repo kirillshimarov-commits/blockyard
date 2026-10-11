@@ -4,6 +4,7 @@ pub mod appearance;
 pub mod auth;
 pub mod crash;
 pub mod curseforge;
+pub mod embed;
 pub mod fabric;
 pub mod forge;
 pub mod http;

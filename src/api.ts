@@ -70,6 +70,8 @@ export interface PendingDownload {
 export interface Settings {
   username: string;
   memoryMb: number;
+  /** Show the game inside the launcher window (Windows). */
+  embedGame: boolean;
   /** UUID of the Microsoft account in use; offline when empty. */
   activeAccount?: string | null;
 }

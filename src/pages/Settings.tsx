@@ -157,7 +157,7 @@ export default function SettingsPage(props: Props) {
 
   async function save() {
     try {
-      const next = { ...draft, activeAccount: settings.activeAccount };
+      const next = { ...draft, activeAccount: settings.activeAccount, embedGame: settings.embedGame };
       await api.saveSettings(next);
       onSaved(next);
       notify("Настройки сохранены");
@@ -235,6 +235,28 @@ export default function SettingsPage(props: Props) {
           />
         </label>
         {!valid && <div className="hint">От 3 до 16 символов: латинские буквы, цифры и _</div>}
+
+        <h3 className="section-gap">Игра</h3>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={settings.embedGame ?? true}
+            onChange={async (e) => {
+              const next = { ...settings, embedGame: e.target.checked };
+              try {
+                await api.saveSettings(next);
+                onSaved(next);
+              } catch (err) {
+                notify(errorText(err), true);
+              }
+            }}
+          />
+          Открывать игру внутри окна лаунчера
+        </label>
+        <p className="muted small">
+          Minecraft появляется прямо в лаунчере, без отдельного окна. Если вместо игры чёрный экран или не работает
+          мышь — выключите.
+        </p>
 
         <h3 className="section-gap">Новые сборки</h3>
         <Slider
