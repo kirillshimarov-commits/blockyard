@@ -17,6 +17,7 @@ pub mod mojang;
 pub mod tunnel;
 pub mod updater;
 pub mod updates;
+pub mod yggdrasil;
 pub mod paths;
 pub mod settings;
 

@@ -208,6 +208,13 @@ async fn prepare_inner(instance: &Instance, session: &Session, reporter: &Report
 
     let mut args = vec![format!("-Xmx{}M", instance.memory_mb), "-Xms512M".to_string()];
     args.extend(split_args(&settings.jvm_args));
+    // Offline players: let worlds opened to LAN accept them (see yggdrasil.rs).
+    // If authlib-injector cannot be downloaded, the game still starts as before.
+    if session.user_type == "legacy" {
+        if let Ok(extra) = super::yggdrasil::jvm_args().await {
+            args.extend(extra);
+        }
+    }
     match &version.arguments {
         Some(a) if !a.jvm.is_empty() => args.extend(expand(&a.jvm)),
         // Old versions have no JVM arguments in their JSON.

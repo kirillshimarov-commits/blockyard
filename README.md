@@ -92,6 +92,7 @@ src-tauri/src/
     auth.rs              вход через Microsoft (device code → Xbox → Minecraft)
     crash.rs             разбор отчётов о сбоях
     tunnel.rs            игра с другом: P2P-туннель (iroh)
+    yggdrasil.rs         локальная авторизация офлайн-игроков (authlib-injector)
     instance.rs          сборки
 ```
 
