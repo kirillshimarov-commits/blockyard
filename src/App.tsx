@@ -381,6 +381,8 @@ export default function App() {
             onStop={(id) => api.stop(id)}
             onJoinFriend={() => setJoining(true)}
             onBrowseModpacks={() => setView({ kind: "browse", content: "modpack" })}
+            onBrowse={(content, instanceId) => setView({ kind: "browse", content, instanceId })}
+            onChanged={updateInstance}
             onCreated={(inst) => setInstances((list) => [inst, ...list])}
             notify={notify}
           />

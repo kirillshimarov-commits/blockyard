@@ -131,6 +131,15 @@ export interface InstallResult {
   warnings: string[];
 }
 
+export interface News {
+  title: string;
+  version: string;
+  kind: string;
+  image?: string | null;
+  text: string;
+  date: string;
+}
+
 export type GameState = "installing" | "running" | "stopped";
 
 export interface ProgressEvent {
@@ -194,6 +203,7 @@ export const api = {
   launch: (id: string) => invoke<void>("launch_instance", { id }),
   stop: (id: string) => invoke<void>("stop_instance", { id }),
   curseforgeAvailable: () => invoke<boolean>("curseforge_available"),
+  minecraftNews: () => invoke<News[]>("minecraft_news"),
   search: (
     kind: ContentKind,
     source: Source,

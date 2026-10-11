@@ -1637,10 +1637,18 @@ button.status-chip {
 /* ---------- Home ---------- */
 
 .home {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
   padding: 18px 0 32px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.home > :not(.hero-backdrop) {
+  position: relative;
+}
+.home-welcome {
   overflow: hidden;
 }
 .tile-row {
@@ -1751,13 +1759,14 @@ button.status-chip {
 }
 
 .hero {
-  flex: 1;
-  min-height: 0;
+  /* Takes the spare height so the shelf sits at the bottom on big screens. */
+  flex: 1 0 auto;
+  min-height: clamp(230px, 36vh, 440px);
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 32px;
-  padding: 24px 56px 0;
+  padding: 16px 56px 8px;
 }
 .hero-info {
   display: flex;
@@ -1778,7 +1787,7 @@ button.status-chip {
   animation-delay: 180ms;
 }
 .hero-title {
-  font-size: clamp(30px, 4.6vw, 52px);
+  font-size: clamp(30px, min(4.6vw, 7vh), 68px);
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.05;
@@ -1926,10 +1935,10 @@ button.status-chip {
     float 7s ease-in-out 0.6s infinite;
 }
 .hero-art .instance-cover.large {
-  width: clamp(160px, 22vw, 260px);
-  height: clamp(160px, 22vw, 260px);
+  width: clamp(160px, min(22vw, 34vh), 360px);
+  height: clamp(160px, min(22vw, 34vh), 360px);
   border-radius: 28px;
-  font-size: clamp(64px, 9vw, 110px);
+  font-size: clamp(64px, min(9vw, 14vh), 150px);
   box-shadow:
     0 0 0 1px rgb(255 255 255 / 0.08),
     0 30px 80px rgb(0 0 0 / 0.55),
@@ -2141,4 +2150,241 @@ button.status-chip {
 .app.console .toast {
   border-radius: 14px;
   animation: pop-in 0.3s ease;
+}
+
+/* ---------- Home: backdrop and shelf ---------- */
+
+.hero-backdrop {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 62%;
+  height: min(720px, 85%);
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.38;
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 70% 45%, black 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 70% at 70% 45%, black 20%, transparent 75%);
+  animation: fade-in 0.8s ease;
+}
+.hero-backdrop img,
+.hero-backdrop span {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  filter: blur(50px) saturate(1.4);
+  transform: scale(1.15);
+}
+.hero-backdrop span {
+  background: radial-gradient(circle, var(--accent), transparent 70%);
+  color: transparent;
+}
+
+.shelf {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  flex-shrink: 0;
+  padding: 18px 56px 0;
+}
+@media (max-width: 960px) {
+  .shelf {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shelf-card.news {
+    grid-column: span 2;
+  }
+}
+.shelf-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: clamp(236px, 27vh, 320px);
+  padding: 16px 16px 12px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 20px;
+  background: rgb(255 255 255 / 0.045);
+  backdrop-filter: blur(18px);
+  animation: fade-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition:
+    border-color 0.25s,
+    transform 0.25s,
+    background 0.25s;
+}
+.shelf-card:nth-child(2) {
+  animation-delay: 70ms;
+}
+.shelf-card:nth-child(3) {
+  animation-delay: 140ms;
+}
+.shelf-card:hover {
+  border-color: rgb(255 255 255 / 0.16);
+  background: rgb(255 255 255 / 0.065);
+}
+.shelf-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.shelf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shelf-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  min-width: 0;
+  font-size: 13px;
+}
+.shelf-list li.off {
+  opacity: 0.5;
+}
+.shelf-list li.skeleton {
+  height: 34px;
+  border-radius: 10px;
+}
+.block {
+  display: block;
+}
+.shelf-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 0.08);
+  object-fit: cover;
+  font-weight: 700;
+  font-size: 13px;
+}
+.shelf-icon.letter {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.mini-add {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #0b0a12;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.mini-add:hover:not(:disabled) {
+  transform: scale(1.12);
+}
+.mini-add:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.mini-add .spinner {
+  width: 14px;
+  height: 14px;
+  border-color: rgb(0 0 0 / 0.2);
+  border-top-color: #0b0a12;
+}
+.shelf-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.shelf-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.shelf-more:hover {
+  color: var(--text);
+}
+.shelf-more svg {
+  transition: transform 0.2s;
+}
+.shelf-more:hover svg {
+  transform: translateX(3px);
+}
+
+.shelf-card.news.with-image {
+  background-size: cover;
+  background-position: center;
+}
+.shelf-card.news.with-image::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(8 6 18 / 0.35) 0%, rgb(8 6 18 / 0.55) 45%, rgb(8 6 18 / 0.95) 100%);
+}
+.shelf-card.news > * {
+  position: relative;
+}
+.shelf-card.news.with-image:hover {
+  transform: translateY(-2px);
+}
+.news-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+}
+.news-title {
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+.news-text {
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgb(255 255 255 / 0.75);
+  font-size: 13px;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200px 0;
+  }
+  to {
+    background-position: 200px 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.04), rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.04)) 0 0 / 400px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.skeleton.line {
+  height: 16px;
+  border-radius: 6px;
+}
+.skeleton.line.short {
+  width: 60%;
 }

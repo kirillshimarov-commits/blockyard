@@ -321,6 +321,11 @@ fn stop_instance(id: String, running: State<'_, Running>) {
 // ---------- Mods ----------
 
 #[tauri::command]
+async fn minecraft_news() -> CmdResult<Vec<launcher::news::News>> {
+    launcher::news::latest().await.map_err(err)
+}
+
+#[tauri::command]
 fn curseforge_available() -> bool {
     curseforge::is_available()
 }
@@ -745,6 +750,7 @@ pub fn run() {
             launch_instance,
             stop_instance,
             curseforge_available,
+            minecraft_news,
             search_mods,
             install_mod,
             import_pending_mods,

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { api, errorText, Instance, loaderLabel } from "../api";
+import { api, ContentKind, errorText, Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
 import CreateInstanceModal from "../components/CreateInstanceModal";
 import { Icon } from "../components/Icon";
 import InstanceCover from "../components/InstanceCover";
+import HomeShelf from "../components/HomeShelf";
 
 interface Props {
   instances: Instance[];
@@ -14,6 +15,8 @@ interface Props {
   onStop: (id: string) => void;
   onJoinFriend: () => void;
   onBrowseModpacks: () => void;
+  onBrowse: (kind: ContentKind, instanceId: string) => void;
+  onChanged: (inst: Instance) => void;
   onCreated: (inst: Instance) => void;
   notify: (text: string, error?: boolean) => void;
 }
@@ -30,7 +33,8 @@ function lastPlayedLabel(ts?: number | null): string {
 
 /** Console-style home: a row of tiles and a large card for the selected instance. */
 export default function Home(props: Props) {
-  const { instances, status, onOpen, onPlay, onStop, onJoinFriend, onBrowseModpacks, onCreated, notify } = props;
+  const { instances, status, onOpen, onPlay, onStop, onJoinFriend, onBrowseModpacks, onBrowse, onChanged, onCreated, notify } =
+    props;
   const [creating, setCreating] = useState(false);
   const [menu, setMenu] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => {
@@ -167,6 +171,9 @@ export default function Home(props: Props) {
 
   return (
     <div className="home" onClick={() => setMenu(false)}>
+      <div className="hero-backdrop" key={`bg-${selected.id}`} aria-hidden>
+        {selected.iconUrl ? <img src={selected.iconUrl} alt="" /> : <span>{selected.name.slice(0, 1).toUpperCase()}</span>}
+      </div>
       <div className="tile-row" ref={row}>
         <button className="tile tile-action" title="Сетевая игра: зайти в мир друга" onClick={onJoinFriend}>
           <Icon name="users" size={26} />
@@ -278,6 +285,15 @@ export default function Home(props: Props) {
           <InstanceCover instance={selected} large />
         </div>
       </section>
+
+      <HomeShelf
+        key={`shelf-${selected.id}`}
+        instance={selected}
+        onOpen={() => onOpen(selected.id)}
+        onBrowse={(kind) => onBrowse(kind, selected.id)}
+        onChanged={onChanged}
+        notify={notify}
+      />
 
       {createModal}
     </div>
