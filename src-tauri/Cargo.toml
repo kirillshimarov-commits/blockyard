@@ -1,6 +1,6 @@
 [package]
 name = "blockyard"
-version = "0.4.0"
+version = "0.4.1"
 description = "Minecraft launcher with Modrinth mods"
 edition = "2021"
 

@@ -80,6 +80,28 @@ async fn load_version(instance: &Instance, reporter: &Reporter, repair: bool) ->
 }
 
 /// Downloads everything the instance needs and builds the java command line.
+/// The game jar for the classpath, named after the version being launched.
+///
+/// Forge 1.17+ and NeoForge skip "${version_name}.jar" when building Java modules (their
+/// `ignoreList`); if the vanilla jar keeps its own name it becomes an extra module and the
+/// game fails with "Modules minecraft and _1._20._1 export package ...". Like the official
+/// launcher, put a copy of the vanilla jar in the loader's version folder.
+fn game_jar(version: &VersionJson) -> Result<PathBuf> {
+    let vanilla = mojang::client_jar_path(&version.client_jar_id);
+    if version.id == version.client_jar_id {
+        return Ok(vanilla);
+    }
+    let own = mojang::client_jar_path(&version.id);
+    let size = |p: &PathBuf| std::fs::metadata(p).map(|m| m.len()).ok();
+    if size(&own).is_none() || size(&own) != size(&vanilla) {
+        if let Some(dir) = own.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::copy(&vanilla, &own).context("не удалось подготовить файл игры")?;
+    }
+    Ok(own)
+}
+
 /// Offline session: any nickname, the same UUID the vanilla server would assign.
 pub fn offline_session(username: &str) -> Session {
     Session {
@@ -129,7 +151,7 @@ async fn prepare_inner(instance: &Instance, session: &Session, reporter: &Report
         .filter(|l| l.classpath)
         .map(|l| l.path.to_string_lossy().into_owned())
         .collect();
-    classpath.push(mojang::client_jar_path(&version.client_jar_id).to_string_lossy().into_owned());
+    classpath.push(game_jar(&version)?.to_string_lossy().into_owned());
 
     let assets_root = paths::assets_dir();
     let game_assets = match &layout {
