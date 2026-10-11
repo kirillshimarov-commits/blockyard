@@ -777,7 +777,7 @@ pub fn run() {
                 // Keep an embedded game filling the window and receiving the keyboard.
                 let handle = app.handle().clone();
                 window.on_window_event(move |event| match event {
-                    WindowEvent::Resized(_) => {
+                    WindowEvent::Resized(_) | WindowEvent::Moved(_) => {
                         if let Some(parent) = main_hwnd(&handle) {
                             launcher::embed::resize_all(parent);
                         }

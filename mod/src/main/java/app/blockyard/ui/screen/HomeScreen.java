@@ -1,13 +1,10 @@
 package app.blockyard.ui.screen;
 
 import app.blockyard.ui.BlockyardUi;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.TitleScreen;
-import net.minecraft.client.gui.screen.multiplayer.AddServerScreen;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
-import net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen;
 import net.minecraft.client.gui.screen.option.OptionsScreen;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
 import net.minecraft.client.gui.screen.world.SelectWorldScreen;
@@ -18,6 +15,7 @@ import net.minecraft.client.option.ServerList;
 import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -42,9 +40,14 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Console-style main menu: tabs, a row of world/server tiles and a large card for the selected one. */
+/**
+ * Console-style main menu. Everything is laid out on a virtual canvas 270 units tall, scaled to the
+ * window, so it looks the same at any GUI scale; shapes are smooth textures and text uses TTF fonts.
+ */
 public class HomeScreen extends Screen {
+    private static final float CANVAS_H = 270f;
     private static final int TAB_SINGLE = 0, TAB_MULTI = 1;
+    private static final int WHITE = 0xFFFFFF, INK = 0x0B0A12;
     private static final ExecutorService PINGER = Executors.newFixedThreadPool(4, r -> {
         Thread t = new Thread(r, "Blockyard server pinger");
         t.setDaemon(true);
@@ -52,6 +55,7 @@ public class HomeScreen extends Screen {
     });
 
     // Remembered while the game runs, so coming back from a world keeps the place.
+    private static boolean introDone = false;
     private static int tab = TAB_MULTI;
     private static final int[] selected = {0, 0};
 
@@ -59,13 +63,21 @@ public class HomeScreen extends Screen {
     private final MultiplayerServerListPinger pinger = new MultiplayerServerListPinger();
     private final List<Region> regions = new ArrayList<>();
     private final Map<String, Identifier> icons = new HashMap<>();
-    private final Map<String, byte[]> iconSources = new HashMap<>();
-    private ServerList servers;
+    private final Map<String, Object> iconSources = new HashMap<>();
+    ServerList servers;
     private List<LevelSummary> worlds = null;
-    private boolean menuOpen = false;
-    private long openedAt;
 
-    private record Region(int x, int y, int w, int h, Runnable action) {
+    private boolean menuOpen = false;
+    private float menuX, menuY;
+    private long changedAt = System.currentTimeMillis();
+    private long introLeaveAt = 0;
+    private String flash = null;
+    private long flashAt = 0;
+
+    // Virtual canvas.
+    private float k = 1, vw = 480;
+
+    private record Region(float x, float y, float w, float h, Runnable action, boolean menu) {
         boolean contains(double mx, double my) {
             return mx >= x && mx < x + w && my >= y && my < y + h;
         }
@@ -78,7 +90,6 @@ public class HomeScreen extends Screen {
     @Override
     protected void init() {
         BlockyardUi.loadConfig();
-        openedAt = System.currentTimeMillis();
         servers = new ServerList(client);
         servers.loadFile();
         for (int i = 0; i < servers.size(); i++) ping(servers.get(i));
@@ -98,7 +109,7 @@ public class HomeScreen extends Screen {
         }
     }
 
-    private void ping(ServerInfo info) {
+    void ping(ServerInfo info) {
         if (info.getStatus() != ServerInfo.Status.INITIAL) return;
         info.setStatus(ServerInfo.Status.PINGING);
         info.label = Text.empty();
@@ -129,10 +140,10 @@ public class HomeScreen extends Screen {
 
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Everything is drawn in render().
+        // Drawn in render().
     }
 
-    // ---------------------------------------------------------------- entries
+    // ================================================================ entries
 
     private int count() {
         return tab == TAB_MULTI ? servers.size() : (worlds == null ? 0 : worlds.size());
@@ -170,7 +181,7 @@ public class HomeScreen extends Screen {
         LevelSummary w = worlds.get(i);
         String key = "w" + w.getName();
         if (!iconSources.containsKey(key)) {
-            iconSources.put(key, new byte[0]);
+            iconSources.put(key, Boolean.TRUE);
             Path path = w.getIconPath();
             if (path != null && Files.isRegularFile(path)) {
                 try (InputStream in = Files.newInputStream(path)) {
@@ -185,11 +196,13 @@ public class HomeScreen extends Screen {
 
     private void register(String key, NativeImage image) {
         Identifier id = Identifier.of("blockyard-ui", "icons/" + Integer.toHexString(key.hashCode()));
-        client.getTextureManager().registerTexture(id, new NativeImageBackedTexture(image));
+        NativeImageBackedTexture texture = new NativeImageBackedTexture(image);
+        texture.setFilter(true, false);
+        client.getTextureManager().registerTexture(id, texture);
         icons.put(key, id);
     }
 
-    private void play(int i) {
+    void play(int i) {
         click();
         if (tab == TAB_MULTI) {
             ServerInfo s = servers.get(i);
@@ -201,202 +214,286 @@ public class HomeScreen extends Screen {
 
     private void add() {
         click();
-        if (tab == TAB_MULTI) {
-            ServerInfo info = new ServerInfo(Text.translatable("selectServer.defaultName").getString(), "", ServerInfo.ServerType.OTHER);
-            client.setScreen(new AddServerScreen(this, confirmed -> {
-                if (confirmed) {
-                    servers.add(info, false);
-                    servers.saveFile();
-                    selected[TAB_MULTI] = servers.size() - 1;
-                }
-                client.setScreen(new HomeScreen());
-            }, info));
-        } else {
-            CreateWorldScreen.create(client, this);
-        }
+        if (tab == TAB_MULTI) client.setScreen(new ServerEditScreen(this, -1));
+        else CreateWorldScreen.create(client, this);
     }
 
-    private void click() {
+    void click() {
         client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
 
-    // ---------------------------------------------------------------- rendering
+    private void select(int i) {
+        if (selected[tab] == i) return;
+        selected[tab] = i;
+        changedAt = System.currentTimeMillis();
+        click();
+    }
+
+    private void switchTab(int target) {
+        menuOpen = false;
+        if (tab == target) return;
+        click();
+        tab = target;
+        changedAt = System.currentTimeMillis();
+    }
+
+    private void notice(String text) {
+        flash = text;
+        flashAt = System.currentTimeMillis();
+    }
+
+    // ================================================================ rendering
+
+    private static float ease(float t) {
+        t = Math.max(0, Math.min(1, t));
+        return 1 - (1 - t) * (1 - t) * (1 - t);
+    }
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         regions.clear();
         int accent = BlockyardUi.accent;
-        background.render(ctx, width, height, accent);
-        float appear = Math.min(1f, (System.currentTimeMillis() - openedAt) / 400f);
+        long now = System.currentTimeMillis();
 
-        drawTopBar(ctx, mouseX, mouseY);
-        int idx = current();
-        int rowBottom = drawTiles(ctx, mouseX, mouseY, idx, accent, appear);
-        if (idx >= 0) drawHero(ctx, mouseX, mouseY, idx, rowBottom, accent, appear);
-        else drawEmpty(ctx, mouseX, mouseY, rowBottom);
+        float introFade = introDone ? 1 : 0;
+        if (introLeaveAt > 0) introFade = ease((now - introLeaveAt) / 450f);
+        background.render(ctx, width, height, accent, 1f);
 
-        ctx.drawText(textRenderer, "← → выбор   Enter играть   Tab вкладки", 14, height - 14, 0x66FFFFFF, false);
-        String brand = "Blockyard";
-        ctx.drawText(textRenderer, brand, width - 14 - textRenderer.getWidth(brand), height - 14, 0x55FFFFFF, false);
+        k = height / CANVAS_H;
+        vw = width / k;
+        float mx = mouseX / k, my = mouseY / k;
+        MatrixStack m = ctx.getMatrices();
+        m.push();
+        m.scale(k, k, 1);
 
-        if (menuOpen) drawMenu(ctx, mouseX, mouseY);
+        if (!introDone || introLeaveAt > 0 && introFade < 1) {
+            drawIntro(ctx, mx, my, accent, 1 - introFade);
+            if (introLeaveAt > 0 && introFade >= 1) {
+                introDone = true;
+                introLeaveAt = 0;
+            }
+        }
+        if (introDone || introLeaveAt > 0) {
+            float a = introDone && introLeaveAt == 0 ? 1 : introFade;
+            drawTopBar(ctx, mx, my, accent, a);
+            int idx = current();
+            float rowBottom = drawTiles(ctx, mx, my, idx, accent, a);
+            float appear = ease((now - changedAt) / 380f) * a;
+            if (idx >= 0) drawHero(ctx, mx, my, idx, rowBottom, accent, appear);
+            else drawEmpty(ctx, mx, my, rowBottom, accent, a);
+            if (menuOpen) drawMenu(ctx, mx, my);
+            if (flash != null && now - flashAt < 2600) {
+                float fa = Math.min(1, (2600 - (now - flashAt)) / 400f);
+                float w = Ui.width(textRenderer, flash, Ui.BODY) + 24;
+                Ui.round(ctx, (vw - w) / 2, CANVAS_H - 34, w, 18, 9, Ui.argb(0.9f * fa, 0x1A1828));
+                Ui.centered(ctx, textRenderer, flash, Ui.BODY, vw / 2, CANVAS_H - 28.5f, Ui.argb(fa, WHITE));
+            }
+        }
+        m.pop();
     }
 
-    private boolean hover(int mx, int my, int x, int y, int w, int h) {
+    private boolean hover(float mx, float my, float x, float y, float w, float h) {
         return !menuOpen && mx >= x && mx < x + w && my >= y && my < y + h;
     }
 
-    private void drawTopBar(DrawContext ctx, int mx, int my) {
+    private void region(float x, float y, float w, float h, Runnable action) {
+        regions.add(new Region(x, y, w, h, action, false));
+    }
+
+    // ---------------------------------------------------------------- intro
+
+    private void drawIntro(DrawContext ctx, float mx, float my, int accent, float a) {
+        if (a <= 0.01f) return;
+        String clock = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")) + ", "
+                + capitalize(LocalDate.now().getDayOfWeek().getDisplayName(java.time.format.TextStyle.FULL, Locale.forLanguageTag("ru")));
+        Ui.text(ctx, textRenderer, clock, Ui.BODY, vw - 18 - Ui.width(textRenderer, clock, Ui.BODY), 14, Ui.argb(0.55f * a, WHITE));
+
+        float cy = CANVAS_H * 0.40f;
+        String hello = "Добро пожаловать в ";
+        String brand = "Blockyard";
+        float hw = Ui.width(textRenderer, hello, Ui.HEAD), bw = Ui.width(textRenderer, brand, Ui.HEAD);
+        float x = (vw - hw - bw) / 2;
+        Ui.text(ctx, textRenderer, hello, Ui.HEAD, x, cy, Ui.argb(0.92f * a, WHITE));
+        Ui.text(ctx, textRenderer, brand, Ui.HEAD, x + hw, cy, Ui.argb(a, Ui.mix(accent, WHITE, 0.45f)));
+        Ui.centered(ctx, textRenderer, "Во что сегодня играем?", Ui.BODY, vw / 2, cy + 17, Ui.argb(0.5f * a, WHITE));
+
+        String[] icons = {"gear", "cube", "globe"};
+        String[] labels = {"Настройки", "Одиночная игра", "Сетевая игра"};
+        float r = 17, gap = 58, oy = cy + 58;
+        float ox = vw / 2 - gap;
+        for (int i = 0; i < 3; i++) {
+            float cx = ox + i * gap;
+            boolean hov = mx >= cx - r && mx < cx + r && my >= oy - r && my < oy + r && introLeaveAt == 0;
+            float s = hov ? 1.12f : 1f;
+            if (hov) Ui.light(ctx, Ui.tex("glow"), cx - r * 2.6f, oy - r * 2.6f, r * 5.2f, r * 5.2f, Ui.argb(0.45f * a, accent));
+            Ui.circle(ctx, cx, oy, r * s + (hov ? 1.2f : 0), Ui.argb((hov ? 0.85f : 0) * a, WHITE));
+            Ui.circle(ctx, cx, oy, r * s, Ui.argb((hov ? 0.30f : 0.10f) * a, WHITE));
+            float is = 15 * s;
+            Ui.icon(ctx, icons[i], cx - is / 2, oy - is / 2, is, Ui.argb((hov ? 1f : 0.55f) * a, WHITE));
+            if (hov) Ui.centered(ctx, textRenderer, labels[i], Ui.BODY, cx, oy + r + 8, Ui.argb(a, WHITE));
+            final int which = i;
+            region(cx - r, oy - r, r * 2, r * 2, () -> {
+                if (introLeaveAt > 0) return;
+                click();
+                if (which == 0) {
+                    introDone = true;
+                    client.setScreen(new OptionsScreen(this, client.options));
+                    return;
+                }
+                tab = which == 1 ? TAB_SINGLE : TAB_MULTI;
+                introLeaveAt = System.currentTimeMillis();
+                changedAt = introLeaveAt + 200;
+            });
+        }
+        Ui.centered(ctx, textRenderer, "Blockyard · Minecraft 1.21.1", Ui.BODY, vw / 2, CANVAS_H - 16, Ui.argb(0.22f * a, WHITE));
+    }
+
+    private static String capitalize(String s) {
+        return s.isEmpty() ? s : s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1);
+    }
+
+    // ---------------------------------------------------------------- top bar
+
+    private void drawTopBar(DrawContext ctx, float mx, float my, int accent, float a) {
         String[] labels = {"Одиночная игра", "Сетевая игра"};
-        int x = 12, y = 10, h = 20;
-        int total = 4;
-        for (String l : labels) total += textRenderer.getWidth(l) + 18;
-        Draw.round(ctx, x, y, total, h, 10, 0x1AFFFFFF);
-        int cx = x + 2;
+        float x = 16, y = 10, h = 15;
         for (int i = 0; i < labels.length; i++) {
-            int w = textRenderer.getWidth(labels[i]) + 16;
+            float w = Ui.width(textRenderer, labels[i], Ui.BODY) + 18;
             boolean active = i == tab;
-            boolean hov = hover(mx, my, cx, y + 2, w, h - 4);
-            if (active) Draw.round(ctx, cx, y + 2, w, h - 4, 8, 0xFFFFFFFF);
-            else if (hov) Draw.round(ctx, cx, y + 2, w, h - 4, 8, 0x1FFFFFFF);
-            ctx.drawText(textRenderer, labels[i], cx + 8, y + 6, active ? 0xFF0B0A12 : 0xC0FFFFFF, false);
+            boolean hov = hover(mx, my, x, y, w, h);
+            if (active) {
+                Ui.light(ctx, Ui.tex("glow"), x - 6, y - 8, w + 12, h + 16, Ui.argb(0.18f * a, WHITE));
+                Ui.round(ctx, x, y, w, h, h / 2, Ui.argb(a, WHITE));
+            } else if (hov) {
+                Ui.round(ctx, x, y, w, h, h / 2, Ui.argb(0.10f * a, WHITE));
+            }
+            Ui.text(ctx, textRenderer, labels[i], Ui.BODY, x + 9, y + 4, Ui.argb(a * (active ? 1 : hov ? 0.95f : 0.72f), active ? INK : WHITE));
             final int target = i;
-            regions.add(new Region(cx, y + 2, w, h - 4, () -> switchTab(target)));
-            cx += w + 2;
+            region(x, y, w, h, () -> switchTab(target));
+            x += w + 6;
         }
 
-        // Right side: settings, avatar, clock.
         String clock = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-        String settings = "Настройки";
-        int sw = textRenderer.getWidth(settings) + 16;
-        int cw = textRenderer.getWidth(clock);
-        int boxW = 4 + sw + 6 + 16 + 8 + cw + 10;
-        int bx = width - 12 - boxW;
-        Draw.round(ctx, bx, y, boxW, h, 10, 0x1AFFFFFF);
-        int sx = bx + 2;
-        if (hover(mx, my, sx, y + 2, sw, h - 4)) Draw.round(ctx, sx, y + 2, sw, h - 4, 8, 0x1FFFFFFF);
-        ctx.drawText(textRenderer, settings, sx + 8, y + 6, 0xE0FFFFFF, false);
-        regions.add(new Region(sx, y + 2, sw, h - 4, () -> {
-            click();
-            client.setScreen(new OptionsScreen(this, client.options));
-        }));
-        int ax = sx + sw + 6;
-        Draw.round(ctx, ax, y + 2, 16, 16, 8, Draw.argb(255, BlockyardUi.accent));
+        float cw = Ui.width(textRenderer, clock, Ui.BOLD);
+        float rx = vw - 16 - cw;
+        Ui.text(ctx, textRenderer, clock, Ui.BOLD, rx, y + 4, Ui.argb(a, WHITE));
+        float ax = rx - 12 - 7;
+        Ui.circle(ctx, ax, y + h / 2, 7.5f, Ui.argb(a, Ui.mix(accent, WHITE, 0.08f)));
         String name = client.getSession().getUsername();
         String letter = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
-        ctx.drawText(textRenderer, letter, ax + 8 - textRenderer.getWidth(letter) / 2, y + 6, 0xFFFFFFFF, false);
-        ctx.drawText(textRenderer, clock, ax + 16 + 8, y + 6, 0xFFFFFFFF, false);
+        Ui.centered(ctx, textRenderer, letter, Ui.BOLD, ax, y + 4, Ui.argb(a, WHITE));
+        float gx = ax - 12 - 18;
+        boolean hovGear = hover(mx, my, gx - 3, y - 2, 17, 19);
+        if (hovGear) Ui.circle(ctx, gx + 5.5f, y + h / 2, 9, Ui.argb(0.12f * a, WHITE));
+        Ui.icon(ctx, "gear", gx, y + 2, 11, Ui.argb((hovGear ? 1 : 0.85f) * a, WHITE));
+        region(gx - 3, y - 2, 17, 19, () -> {
+            click();
+            client.setScreen(new OptionsScreen(this, client.options));
+        });
     }
 
-    private void switchTab(int target) {
-        if (tab == target) return;
-        click();
-        tab = target;
-        menuOpen = false;
-        openedAt = System.currentTimeMillis();
-    }
+    // ---------------------------------------------------------------- tiles
 
-    /** Draws the tile row; returns the y just below it. */
-    private int drawTiles(DrawContext ctx, int mx, int my, int idx, int accent, float appear) {
-        int base = 30, big = 46, gap = 8;
-        int rowY = 44, center = rowY + big / 2;
+    private float drawTiles(DrawContext ctx, float mx, float my, int idx, int accent, float a) {
+        float base = 34, big = 46, gap = 8, left = 16;
+        float center = 60;
         int n = count();
-        int total = (base + gap) * (n + 1) + (big - base);
-        int x = 18;
-        // Keep the selected tile on screen when there are many.
-        int selX = 18 + (base + gap) * (idx + 1);
-        if (total + 36 > width && selX + big + 18 > width) x -= selX + big + 18 - width;
+        float selX = left + (base + gap) * (idx + 1);
+        float scroll = Math.max(0, selX + big + 24 - vw);
+        float x = left - scroll;
 
         // "+" tile.
         boolean hovAdd = hover(mx, my, x, center - base / 2, base, base);
-        Draw.round(ctx, x, center - base / 2, base, base, 6, hovAdd ? 0x33FFFFFF : 0x1AFFFFFF);
-        ctx.drawText(textRenderer, "+", x + base / 2 - 2, center - 4, 0xDDFFFFFF, false);
-        regions.add(new Region(x, center - base / 2, base, base, this::add));
+        Ui.round(ctx, x, center - base / 2, base, base, 9, Ui.argb((hovAdd ? 0.16f : 0.07f) * a, WHITE));
+        Ui.icon(ctx, "plus", x + base / 2 - 6, center - 6, 12, Ui.argb((hovAdd ? 0.9f : 0.5f) * a, WHITE));
+        region(x, center - base / 2, base, base, this::add);
         x += base + gap;
 
+        long now = System.currentTimeMillis();
         for (int i = 0; i < n; i++) {
             boolean sel = i == idx;
-            int size = sel ? big : base;
-            int ty = center - size / 2 + (int) ((1 - appear) * 10);
+            float size = sel ? big : base;
+            float ty = center - size / 2;
             boolean hov = hover(mx, my, x, ty, size, size);
+            if (hov && !sel) ty -= 2;
+            float r = sel ? 11 : 9;
             if (sel) {
-                // Soft glow and a white ring around the selected tile.
-                Draw.round(ctx, x - 8, ty - 4, size + 16, size + 16, 14, Draw.argb(40, accent));
-                Draw.round(ctx, x - 3, ty - 3, size + 6, size + 6, 10, 0x30FFFFFF);
-                Draw.round(ctx, x - 2, ty - 2, size + 4, size + 4, 9, 0xFFFFFFFF);
+                float pulse = 0.85f + 0.15f * (float) Math.sin(now / 600.0);
+                Ui.light(ctx, Ui.tex("glow"), x - size * 0.6f, ty - size * 0.5f, size * 2.2f, size * 2.2f, Ui.argb(0.42f * a * pulse, accent));
+                Ui.shadow(ctx, x, ty + 4, size, size, 10, 0.6f * a);
+                Ui.round(ctx, x - 2.5f, ty - 2.5f, size + 5, size + 5, r + 2.5f, Ui.argb(a, WHITE));
+            } else {
+                Ui.shadow(ctx, x, ty + 2, size, size, 6, 0.35f * a);
             }
-            drawIcon(ctx, i, x, hov && !sel ? ty - 2 : ty, size, sel ? 7 : 6, accent, sel || hov ? 255 : 190);
+            drawArt(ctx, i, x, ty, size, r, accent, a * (sel || hov ? 1 : 0.62f));
             final int target = i;
-            regions.add(new Region(x, ty, size, size, () -> {
+            region(x, ty, size, size, () -> {
                 if (selected[tab] == target) play(target);
-                else {
-                    click();
-                    selected[tab] = target;
-                    openedAt = System.currentTimeMillis();
-                }
-            }));
+                else select(target);
+            });
             x += size + gap;
         }
 
-        int captionY = rowY + big + 10;
+        float captionY = center + big / 2 + 9;
         if (idx >= 0) {
+            float cx = left + base + gap - scroll;
             String tag = tab == TAB_MULTI ? "сервер" : "мир";
-            int tagW = textRenderer.getWidth(tag) + 10;
-            int cx = 18 + base + gap;
-            Draw.round(ctx, cx, captionY - 2, tagW, 12, 6, 0xFFFFFFFF);
-            ctx.drawText(textRenderer, tag, cx + 5, captionY, 0xFF0B0A12, false);
-            ctx.drawText(textRenderer, Draw.ellipsize(textRenderer, nameOf(idx), width / 2), cx + tagW + 6, captionY, 0xFFFFFFFF, false);
+            float tw = Ui.width(textRenderer, tag, Ui.BOLD) + 10;
+            Ui.round(ctx, cx, captionY, tw, 11, 5.5f, Ui.argb(a, WHITE));
+            Ui.text(ctx, textRenderer, tag, Ui.BOLD, cx + 5, captionY + 2, Ui.argb(a, INK));
+            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, nameOf(idx), Ui.BODY, vw * 0.5f), Ui.BODY, cx + tw + 6, captionY + 2, Ui.argb(a, WHITE));
         }
-        return captionY + 14;
+        return captionY + 16;
     }
 
-    private void drawIcon(DrawContext ctx, int i, int x, int y, int size, int r, int accent, int alpha) {
+    /** The picture of an entry: its icon, or its first letter on an accent gradient. */
+    private void drawArt(DrawContext ctx, int i, float x, float y, float size, float r, int accent, float a) {
         Identifier icon = iconOf(i);
         if (icon != null) {
-            Draw.round(ctx, x, y, size, size, r, 0xFF111018);
-            ctx.drawTexture(icon, x + 1, y + 1, size - 2, size - 2, 0, 0, 64, 64, 64, 64);
-            if (alpha < 255) ctx.fill(x, y, x + size, y + size, Draw.argb(255 - alpha, 0x0B0A12));
+            Ui.round(ctx, x, y, size, size, r, Ui.argb(a, 0x16141F));
+            // Icons are square; inset a little so the rounded frame shows around them.
+            float inset = size * 0.08f;
+            Ui.image(ctx, icon, x + inset, y + inset, size - inset * 2, size - inset * 2, Ui.argb(a, WHITE));
         } else {
-            int top = Draw.mix(accent, 0xFFFFFF, 0.1f), bottom = Draw.mix(accent, 0x000000, 0.35f);
-            Draw.round(ctx, x, y, size, size, r, Draw.argb(alpha, Draw.mix(top, bottom, 0.5f)));
+            Ui.round(ctx, x, y, size, size, r, Ui.argb(a, Ui.mix(accent, WHITE, 0.15f)), Ui.argb(a, Ui.mix(accent, 0x000000, 0.35f)));
             String name = nameOf(i);
             String letter = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
-            float scale = size / 16f;
-            float lw = textRenderer.getWidth(letter) * scale;
-            Draw.text(ctx, textRenderer, letter, x + (size - lw) / 2f, y + (size - 8 * scale) / 2f, scale, Draw.argb(alpha, 0xFFFFFF));
+            MatrixStack m = ctx.getMatrices();
+            m.push();
+            float scale = size / 60f;
+            m.translate(x + size / 2, y + size / 2 - 11 * scale, 0);
+            m.scale(scale, scale, 1);
+            Ui.centered(ctx, textRenderer, letter, Ui.TITLE, 0, 0, Ui.argb(a, WHITE));
+            m.pop();
         }
     }
 
-    private void drawHero(DrawContext ctx, int mx, int my, int idx, int top, int accent, float appear) {
-        int artSize = (int) Math.max(64, Math.min(height * 0.42f, width * 0.26f));
-        int artX = width - artSize - 28;
-        int left = 28;
-        int maxText = artX - left - 24;
-        int lift = (int) ((1 - appear) * 12);
-        int alpha = (int) (255 * appear);
+    // ---------------------------------------------------------------- hero
 
-        float scale = Math.max(2f, Math.min(4f, width / 170f));
-        int heroH = (int) (8 * scale) + 12 + 14 + 18 + 28;
-        int y = top + Math.max(10, (height - 24 - top - heroH) / 2) + lift;
+    private void drawHero(DrawContext ctx, float mx, float my, int idx, float top, int accent, float a) {
+        float lift = (1 - a) * 10;
+        float art = Math.min(118, Math.min(vw * 0.25f, CANVAS_H - top - 40));
+        float artX = vw - art - 26, artY = top + (CANVAS_H - top - art) / 2 - 8 + lift * 0.5f;
+        float left = 26;
+        float maxText = artX - left - 24;
 
-        // Big art on the right with a soft glow.
-        int artY = top + Math.max(6, (height - 24 - top - artSize) / 2) - lift;
-        Draw.round(ctx, artX - 12, artY - 8, artSize + 24, artSize + 24, 22, Draw.argb((int) (36 * appear), accent));
-        drawIcon(ctx, idx, artX, artY, artSize, 14, accent, alpha);
+        // Big art with glow on the right.
+        Ui.light(ctx, Ui.tex("glow"), artX - art * 0.5f, artY - art * 0.45f, art * 2, art * 2, Ui.argb(0.35f * a, accent));
+        Ui.shadow(ctx, artX, artY + 8, art, art, 22, 0.75f * a);
+        drawArt(ctx, idx, artX, artY, art, 18, accent, a);
 
-        String title = Draw.ellipsize(textRenderer, nameOf(idx), (int) (maxText / scale));
-        Draw.text(ctx, textRenderer, title, left, y, scale, Draw.argb(alpha, 0xFFFFFF));
-        y += (int) (8 * scale) + 10;
+        float y = top + Math.max(6, (CANVAS_H - top - 120) / 2) + lift;
+        Ui.text(ctx, textRenderer, Ui.fit(textRenderer, nameOf(idx), Ui.TITLE, maxText), Ui.TITLE, left, y, Ui.argb(a, WHITE));
+        y += 30;
 
-        String detail;
-        String status;
+        String detail, status, motd = null;
         int dot;
         if (tab == TAB_MULTI) {
             ServerInfo s = servers.get(idx);
             detail = "IP: " + s.address;
             switch (s.getStatus()) {
                 case SUCCESSFUL -> {
-                    status = s.playerCountLabel.getString() + "  ·  " + s.ping + " мс";
+                    status = s.playerCountLabel.getString() + " игроков  ·  " + s.ping + " мс";
                     dot = 0x3EE08F;
                 }
                 case INCOMPATIBLE -> {
@@ -412,6 +509,7 @@ public class HomeScreen extends Screen {
                     dot = 0x9AA0B0;
                 }
             }
+            if (s.label != null && !s.label.getString().isBlank()) motd = s.label.getString().replace('\n', ' ').trim();
         } else {
             LevelSummary w = worlds.get(idx);
             detail = w.getDetails().getString();
@@ -426,72 +524,88 @@ public class HomeScreen extends Screen {
             }
             dot = 0x9AA0B0;
         }
-        ctx.drawText(textRenderer, Draw.ellipsize(textRenderer, detail, maxText), left, y, Draw.argb((int) (170 * appear), 0xFFFFFF), false);
-        y += 16;
+        Ui.text(ctx, textRenderer, Ui.fit(textRenderer, detail, Ui.BODY, maxText), Ui.BODY, left, y, Ui.argb(0.55f * a, WHITE));
+        y += 14;
 
-        String chip = Draw.ellipsize(textRenderer, status, maxText - 20);
-        int chipW = textRenderer.getWidth(chip) + 22;
-        Draw.round(ctx, left, y, chipW, 16, 5, Draw.argb((int) (30 * appear), 0xFFFFFF));
-        Draw.round(ctx, left + 7, y + 6, 4, 4, 2, Draw.argb(alpha, dot));
-        ctx.drawText(textRenderer, chip, left + 15, y + 4, Draw.argb(alpha, 0xFFFFFF), false);
-        if (tab == TAB_MULTI) {
-            Text motd = servers.get(idx).label;
-            if (motd != null && !motd.getString().isBlank()) {
-                ctx.drawText(textRenderer, Draw.ellipsize(textRenderer, motd.getString().replace('\n', ' '), maxText), left, y + 22, Draw.argb((int) (140 * appear), 0xFFFFFF), false);
-            }
+        String chip = Ui.fit(textRenderer, status, Ui.BODY, maxText - 24);
+        float chipW = Ui.width(textRenderer, chip, Ui.BODY) + 24;
+        Ui.round(ctx, left, y, chipW, 15, 5, Ui.argb(0.10f * a, WHITE));
+        Ui.light(ctx, Ui.tex("glow"), left + 3, y + 1.5f, 12, 12, Ui.argb(0.8f * a, dot));
+        Ui.circle(ctx, left + 9, y + 7.5f, 2.2f, Ui.argb(a, dot));
+        Ui.text(ctx, textRenderer, chip, Ui.BODY, left + 16, y + 4, Ui.argb(a, WHITE));
+        if (motd != null) {
+            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, motd, Ui.BODY, maxText), Ui.BODY, left, y + 21, Ui.argb(0.45f * a, WHITE));
         }
-        y += 40;
 
-        // Play and more buttons.
-        String playLabel = "Играть  ▶";
-        int pw = textRenderer.getWidth(playLabel) + 28, ph = 22;
-        boolean hovPlay = hover(mx, my, left, y, pw, ph);
-        if (hovPlay) Draw.round(ctx, left - 3, y - 3, pw + 6, ph + 6, 14, Draw.argb(60, accent));
-        Draw.round(ctx, left, y, pw, ph, 11, 0xFFFFFFFF);
-        ctx.drawText(textRenderer, playLabel, left + 14, y + 7, 0xFF0B0A12, false);
-        regions.add(new Region(left, y, pw, ph, () -> play(idx)));
+        // Buttons pinned near the bottom, like on a console.
+        float by = CANVAS_H - 44 + lift;
+        String label = "Играть";
+        float pw = Ui.width(textRenderer, label, Ui.BOLD) + 40, ph = 21;
+        boolean hovPlay = hover(mx, my, left, by, pw, ph);
+        float grow = hovPlay ? 1.5f : 0;
+        if (hovPlay) Ui.light(ctx, Ui.tex("glow"), left - 20, by - 18, pw + 40, ph + 36, Ui.argb(0.55f * a, accent));
+        Ui.shadow(ctx, left, by + 3, pw, ph, 8, 0.5f * a);
+        Ui.round(ctx, left - grow, by - grow, pw + grow * 2, ph + grow * 2, ph / 2 + grow, Ui.argb(a, WHITE));
+        Ui.text(ctx, textRenderer, label, Ui.BOLD, left + 14, by + 6.5f, Ui.argb(a, INK));
+        Ui.icon(ctx, "play", left + pw - 21, by + 6, 9, Ui.argb(a, INK));
+        region(left, by, pw, ph, () -> play(idx));
 
-        final int btnY = y;
-        int mxBtn = left + pw + 8;
-        boolean hovMore = hover(mx, my, mxBtn, y, ph, ph);
-        Draw.round(ctx, mxBtn, y, ph, ph, 11, hovMore ? 0x40FFFFFF : 0x24FFFFFF);
-        ctx.drawText(textRenderer, "•••", mxBtn + ph / 2 - textRenderer.getWidth("•••") / 2, y + 7, 0xFFFFFFFF, false);
-        regions.add(new Region(mxBtn, y, ph, ph, () -> {
+        float dx = left + pw + 9, dr = ph / 2;
+        boolean hovMore = hover(mx, my, dx, by, ph, ph);
+        Ui.circle(ctx, dx + dr, by + dr, dr, Ui.argb((hovMore ? 0.22f : 0.11f) * a, WHITE));
+        for (int d = -1; d <= 1; d++) Ui.circle(ctx, dx + dr + d * 3.6f, by + dr, 1.15f, Ui.argb(a, WHITE));
+        region(dx, by, ph, ph, () -> {
             click();
             menuOpen = true;
-            menuX = mxBtn;
-            menuY = btnY;
-        }));
+            menuX = dx;
+            menuY = by;
+        });
     }
 
-    private int menuX, menuY;
-
-    private void drawEmpty(DrawContext ctx, int mx, int my, int top) {
-        int cy = top + (height - top) / 2 - 30;
-        String title = tab == TAB_MULTI ? "Серверов пока нет" : (worlds == null ? "Загружаем миры…" : "Миров пока нет");
-        float scale = 2f;
-        Draw.text(ctx, textRenderer, title, (width - textRenderer.getWidth(title) * scale) / 2f, cy, scale, 0xFFFFFFFF);
-        if (worlds == null && tab == TAB_SINGLE) return;
+    private void drawEmpty(DrawContext ctx, float mx, float my, float top, int accent, float a) {
+        float cy = top + (CANVAS_H - top) / 2 - 26;
+        boolean loading = tab == TAB_SINGLE && worlds == null;
+        String title = tab == TAB_MULTI ? "Серверов пока нет" : loading ? "Загружаем миры…" : "Миров пока нет";
+        Ui.centered(ctx, textRenderer, title, Ui.HEAD, vw / 2, cy, Ui.argb(a, WHITE));
+        if (loading) return;
+        Ui.centered(ctx, textRenderer, tab == TAB_MULTI ? "Добавьте сервер по IP-адресу" : "Создайте свой первый мир", Ui.BODY, vw / 2, cy + 16, Ui.argb(0.5f * a, WHITE));
         String label = tab == TAB_MULTI ? "Добавить сервер" : "Создать мир";
-        int bw = textRenderer.getWidth(label) + 28, bh = 22;
-        int bx = (width - bw) / 2, by = cy + 30;
+        float bw = Ui.width(textRenderer, label, Ui.BOLD) + 30, bh = 21, bx = (vw - bw) / 2, by = cy + 34;
         boolean hov = hover(mx, my, bx, by, bw, bh);
-        if (hov) Draw.round(ctx, bx - 3, by - 3, bw + 6, bh + 6, 14, Draw.argb(60, BlockyardUi.accent));
-        Draw.round(ctx, bx, by, bw, bh, 11, 0xFFFFFFFF);
-        ctx.drawText(textRenderer, label, bx + 14, by + 7, 0xFF0B0A12, false);
-        regions.add(new Region(bx, by, bw, bh, this::add));
+        if (hov) Ui.light(ctx, Ui.tex("glow"), bx - 20, by - 18, bw + 40, bh + 36, Ui.argb(0.5f * a, accent));
+        Ui.round(ctx, bx, by, bw, bh, bh / 2, Ui.argb(a, WHITE));
+        Ui.centered(ctx, textRenderer, label, Ui.BOLD, vw / 2, by + 6.5f, Ui.argb(a, INK));
+        region(bx, by, bw, bh, this::add);
     }
 
-    private void drawMenu(DrawContext ctx, int mx, int my) {
+    // ---------------------------------------------------------------- menu
+
+    private void drawMenu(DrawContext ctx, float mx, float my) {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
+        int idx = current();
         if (tab == TAB_MULTI) {
-            labels.add("Управление серверами");
-            actions.add(() -> client.setScreen(new MultiplayerScreen(this)));
+            if (idx >= 0) {
+                labels.add("Изменить сервер");
+                actions.add(() -> client.setScreen(new ServerEditScreen(this, idx)));
+                labels.add("Обновить статус");
+                actions.add(() -> {
+                    ServerInfo s = servers.get(idx);
+                    s.setStatus(ServerInfo.Status.INITIAL);
+                    ping(s);
+                });
+                labels.add("Удалить сервер");
+                actions.add(() -> {
+                    String name = servers.get(idx).name;
+                    servers.remove(servers.get(idx));
+                    servers.saveFile();
+                    notice("Сервер «" + name + "» удалён");
+                });
+            }
             labels.add("Добавить сервер");
             actions.add(this::add);
         } else {
-            labels.add("Управление мирами");
+            labels.add("Все миры");
             actions.add(() -> client.setScreen(new SelectWorldScreen(this)));
             labels.add("Создать мир");
             actions.add(this::add);
@@ -504,39 +618,43 @@ public class HomeScreen extends Screen {
         labels.add("Выйти из игры");
         actions.add(client::scheduleStop);
 
-        int w = 0;
-        for (String l : labels) w = Math.max(w, textRenderer.getWidth(l));
-        w += 24;
-        int rowH = 16, h = labels.size() * rowH + 8;
-        int x = menuX, y = Math.max(4, menuY - h - 6);
-        ctx.getMatrices().push();
-        ctx.getMatrices().translate(0, 0, 200);
-        Draw.round(ctx, x, y, w, h, 8, 0xF0141220);
+        float w = 0;
+        for (String l : labels) w = Math.max(w, Ui.width(textRenderer, l, Ui.BODY));
+        w += 26;
+        float rowH = 15, h = labels.size() * rowH + 8;
+        float x = menuX, y = Math.max(6, menuY - h - 6);
+        MatrixStack m = ctx.getMatrices();
+        m.push();
+        m.translate(0, 0, 300);
+        Ui.shadow(ctx, x, y + 4, w, h, 14, 0.7f);
+        Ui.round(ctx, x, y, w, h, 9, 0xF21A1828);
         for (int i = 0; i < labels.size(); i++) {
-            int ry = y + 4 + i * rowH;
+            float ry = y + 4 + i * rowH;
             boolean hov = mx >= x && mx < x + w && my >= ry && my < ry + rowH;
-            if (hov) Draw.round(ctx, x + 3, ry, w - 6, rowH, 5, 0x22FFFFFF);
-            ctx.drawText(textRenderer, labels.get(i), x + 12, ry + 4, 0xFFFFFFFF, false);
+            if (hov) Ui.round(ctx, x + 3, ry, w - 6, rowH, 6, 0x22FFFFFF);
+            boolean danger = labels.get(i).startsWith("Удалить") || labels.get(i).startsWith("Выйти");
+            Ui.text(ctx, textRenderer, labels.get(i), Ui.BODY, x + 13, ry + 4, danger ? 0xFFFF8A8A : 0xFFFFFFFF);
             final Runnable action = actions.get(i);
             regions.add(new Region(x, ry, w, rowH, () -> {
                 click();
                 menuOpen = false;
                 action.run();
-            }));
+            }, true));
         }
-        ctx.getMatrices().pop();
+        m.pop();
     }
 
-    // ---------------------------------------------------------------- input
+    // ================================================================ input
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
+        double mx = mouseX / k, my = mouseY / k;
         // Later regions are drawn on top (the menu), so check them first.
         for (int i = regions.size() - 1; i >= 0; i--) {
             Region r = regions.get(i);
-            if (r.contains(mouseX, mouseY)) {
-                if (menuOpen && i < regions.size() - menuItemCount()) break;
+            if (menuOpen && !r.menu()) continue;
+            if (r.contains(mx, my)) {
                 r.action().run();
                 return true;
             }
@@ -548,32 +666,27 @@ public class HomeScreen extends Screen {
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    private int menuItemCount() {
-        return 4;
-    }
-
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (menuOpen && keyCode == GLFW.GLFW_KEY_ESCAPE) {
             menuOpen = false;
             return true;
         }
+        if (!introDone) {
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+                introLeaveAt = System.currentTimeMillis();
+                return true;
+            }
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
         int n = count();
         switch (keyCode) {
             case GLFW.GLFW_KEY_RIGHT -> {
-                if (n > 0 && selected[tab] < n - 1) {
-                    selected[tab]++;
-                    click();
-                    openedAt = System.currentTimeMillis();
-                }
+                if (n > 0 && selected[tab] < n - 1) select(selected[tab] + 1);
                 return true;
             }
             case GLFW.GLFW_KEY_LEFT -> {
-                if (selected[tab] > 0) {
-                    selected[tab]--;
-                    click();
-                    openedAt = System.currentTimeMillis();
-                }
+                if (selected[tab] > 0) select(selected[tab] - 1);
                 return true;
             }
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {

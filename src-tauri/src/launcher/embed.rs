@@ -1,22 +1,23 @@
 //! Shows the game inside the launcher window instead of a separate one (Windows only).
 //!
-//! Once the game has opened its window, it is turned into a borderless child of the launcher
-//! window and stretched over the whole client area. When the game exits its window disappears
-//! and the launcher underneath is visible again.
+//! Once the game has opened its window, it loses its frame, becomes owned by the launcher window
+//! and is laid exactly over its client area, following it when the launcher moves or resizes.
+//! When the game exits its window disappears and the launcher underneath is visible again.
 
 #[cfg(windows)]
 mod imp {
     use std::sync::Mutex;
-    use windows_sys::Win32::Foundation::{HWND, LPARAM, RECT};
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
+    use windows_sys::Win32::Graphics::Gdi::ClientToScreen;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        EnumWindows, GetClassNameW, GetClientRect, GetWindow, GetWindowLongPtrW, GetWindowThreadProcessId, IsWindow,
-        IsWindowVisible, SetParent, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, GWL_STYLE, GW_OWNER, SWP_FRAMECHANGED,
-        SWP_NOZORDER, SWP_SHOWWINDOW, WS_CAPTION, WS_CHILD, WS_EX_APPWINDOW, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME,
-        WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME, WS_VISIBLE,
+        EnumWindows, GetClassNameW, GetClientRect, GetWindow, GetWindowLongPtrW, GetWindowThreadProcessId, IsIconic,
+        IsWindow, IsWindowVisible, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, GWLP_HWNDPARENT, GWL_EXSTYLE,
+        GWL_STYLE, GW_OWNER, HWND_TOP, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOZORDER, SWP_SHOWWINDOW, WS_CAPTION,
+        WS_CHILD, WS_EX_APPWINDOW, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_EX_TOOLWINDOW, WS_EX_WINDOWEDGE,
+        WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME, WS_VISIBLE,
     };
 
-    /// Embedded game windows with their original styles, as raw handles (HWND is a pointer and not Send).
+    /// Covered game windows with their original styles, as raw handles (HWND is a pointer and not Send).
     static EMBEDDED: Mutex<Vec<(isize, isize, isize)>> = Mutex::new(Vec::new());
 
     struct Search {
@@ -48,38 +49,41 @@ mod imp {
         (!search.found.is_null()).then_some(search.found as isize)
     }
 
-    fn fit(game: HWND, parent: HWND) {
+    /// Lays the game window exactly over the launcher's client area, in screen coordinates.
+    fn fit(game: HWND, parent: HWND, flags: u32) {
+        if unsafe { IsIconic(parent) } != 0 {
+            return;
+        }
         let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut origin = POINT { x: 0, y: 0 };
         unsafe {
             GetClientRect(parent, &mut rect);
-            SetWindowPos(
-                game,
-                std::ptr::null_mut(),
-                0,
-                0,
-                rect.right - rect.left,
-                rect.bottom - rect.top,
-                SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW,
-            );
+            ClientToScreen(parent, &mut origin);
+            SetWindowPos(game, HWND_TOP, origin.x, origin.y, rect.right - rect.left, rect.bottom - rect.top, flags);
         }
     }
 
+    /// Turns the game window into a borderless window owned by the launcher and covering it.
+    /// A child window would not be drawn: the launcher's transparent WebView window is composited
+    /// by DWM and does not show OpenGL child windows.
     pub fn attach(game: isize, parent: isize) {
         let (game, parent) = (game as HWND, parent as HWND);
         let (old_style, old_ex) = unsafe { (GetWindowLongPtrW(game, GWL_STYLE), GetWindowLongPtrW(game, GWL_EXSTYLE)) };
         unsafe {
-            let style = old_style as u32;
-            let style = (style & !(WS_POPUP | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX))
-                | WS_CHILD
+            let style = (old_style as u32
+                & !(WS_CHILD | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX))
+                | WS_POPUP
                 | WS_VISIBLE;
             SetWindowLongPtrW(game, GWL_STYLE, style as isize);
-            let ex = old_ex as u32;
-            let ex = ex & !(WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_DLGMODALFRAME);
+            // No taskbar button of its own: the launcher's button stands for both.
+            let ex = (old_ex as u32 & !(WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_DLGMODALFRAME))
+                | WS_EX_TOOLWINDOW;
             SetWindowLongPtrW(game, GWL_EXSTYLE, ex as isize);
-            SetParent(game, parent);
+            // The owner keeps the game above the launcher and hides it when the launcher is minimized.
+            SetWindowLongPtrW(game, GWLP_HWNDPARENT, parent as isize);
         }
-        fit(game, parent);
-        unsafe { SetFocus(game) };
+        fit(game, parent, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+        unsafe { SetForegroundWindow(game) };
         EMBEDDED.lock().unwrap().push((game as isize, old_style, old_ex));
     }
 
@@ -89,7 +93,21 @@ mod imp {
         list.iter().map(|&(h, _, _)| h as HWND).collect()
     }
 
-    /// Gives every embedded game its own window back (before the launcher window goes away).
+    /// Call when the launcher window moves or changes size.
+    pub fn resize_all(parent: isize) {
+        for game in alive() {
+            fit(game, parent as HWND, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        }
+    }
+
+    /// Call when the launcher window is activated: the keyboard belongs to the game.
+    pub fn focus() {
+        if let Some(&game) = alive().last() {
+            unsafe { SetForegroundWindow(game) };
+        }
+    }
+
+    /// Gives every covered game its normal window back (before the launcher window goes away).
     pub fn detach_all() {
         let list: Vec<_> = EMBEDDED.lock().unwrap().drain(..).collect();
         for (h, style, ex) in list {
@@ -98,23 +116,11 @@ mod imp {
                 continue;
             }
             unsafe {
-                SetParent(game, std::ptr::null_mut());
+                SetWindowLongPtrW(game, GWLP_HWNDPARENT, 0);
                 SetWindowLongPtrW(game, GWL_STYLE, style);
                 SetWindowLongPtrW(game, GWL_EXSTYLE, ex);
                 SetWindowPos(game, std::ptr::null_mut(), 80, 80, 1280, 720, SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
             }
-        }
-    }
-
-    pub fn resize_all(parent: isize) {
-        for game in alive() {
-            fit(game, parent as HWND);
-        }
-    }
-
-    pub fn focus() {
-        if let Some(&game) = alive().last() {
-            unsafe { SetFocus(game) };
         }
     }
 }
