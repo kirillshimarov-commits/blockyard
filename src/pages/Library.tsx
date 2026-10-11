@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, errorText, Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
@@ -17,6 +17,16 @@ interface Props {
 
 export default function Library({ instances, status, onOpen, onPlay, onCreated, notify }: Props) {
   const [creating, setCreating] = useState(false);
+
+  // Named groups first (alphabetically), ungrouped instances last.
+  const groups = useMemo(() => {
+    const map = new Map<string, Instance[]>();
+    for (const inst of instances) {
+      const g = inst.settings?.group?.trim() ?? "";
+      map.set(g, [...(map.get(g) ?? []), inst]);
+    }
+    return [...map.entries()].sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+  }, [instances]);
 
   async function importPack() {
     try {
@@ -60,8 +70,11 @@ export default function Library({ instances, status, onOpen, onPlay, onCreated, 
           </button>
         </div>
       ) : (
-        <div className="instance-grid">
-          {instances.map((inst) => {
+        groups.map(([group, list]) => (
+          <section key={group} className="library-group">
+            {groups.length > 1 && <h3>{group || "Без группы"}</h3>}
+            <div className="instance-grid">
+              {list.map((inst) => {
             const state = status[inst.id]?.state ?? "stopped";
             return (
               <div key={inst.id} className="instance-card" onClick={() => onOpen(inst.id)}>
@@ -97,8 +110,10 @@ export default function Library({ instances, status, onOpen, onPlay, onCreated, 
                 </button>
               </div>
             );
-          })}
-        </div>
+              })}
+            </div>
+          </section>
+        ))
       )}
 
       {creating && (

@@ -198,6 +198,13 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session,
         p = launch::prepare(inst, session, &reporter) => p?,
         _ = stop.notified() => return Ok(()),
     };
+    let pre_launch = inst.settings.pre_launch.trim().to_string();
+    if !pre_launch.is_empty() {
+        report_stage(app, &inst.id, "Команда перед запуском");
+        launch::run_hook(&pre_launch, &prepared.game_dir)
+            .await
+            .map_err(|e| anyhow::anyhow!("Команда перед запуском не выполнилась: {e:#}"))?;
+    }
     let started = std::time::SystemTime::now();
     let mut child = launch::spawn(&prepared)?;
     launch::mark_played(inst)?;
@@ -228,7 +235,9 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session,
         });
     }
 
-    tokio::select! {
+    let post_exit = inst.settings.post_exit.trim().to_string();
+    let game_dir = prepared.game_dir.clone();
+    let outcome: anyhow::Result<()> = async { tokio::select! {
         status = child.wait() => {
             let status = status?;
             if !status.success() {
@@ -242,7 +251,20 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session,
             let _ = child.kill().await;
         }
     }
-    Ok(())
+    Ok(()) }.await;
+    if !post_exit.is_empty() {
+        if let Err(e) = launch::run_hook(&post_exit, &game_dir).await {
+            let _ = app.emit("game-log", LogEvent { instance_id: inst.id.clone(), line: format!("[Blockyard] {e:#}") });
+        }
+    }
+    outcome
+}
+
+fn report_stage(app: &AppHandle, instance_id: &str, stage: &str) {
+    let _ = app.emit(
+        "launch-progress",
+        ProgressEvent { instance_id: instance_id.to_string(), progress: Progress { stage: stage.into(), current: 0, total: 1 } },
+    );
 }
 
 #[tauri::command]
@@ -416,6 +438,46 @@ async fn export_instance(instance_id: String, path: String) -> CmdResult<()> {
 }
 
 #[tauri::command]
+fn duplicate_instance(id: String) -> CmdResult<Instance> {
+    instance::duplicate(&id).map_err(err)
+}
+
+#[tauri::command]
+fn save_instance_settings(id: String, patch: instance::InstancePatch, running: State<'_, Running>) -> CmdResult<Instance> {
+    if running.0.lock().unwrap().contains_key(&id) {
+        return Err("Сначала закройте игру".into());
+    }
+    instance::apply_patch(&id, patch).map_err(err)
+}
+
+/// Re-downloads the loader and game files in the background, like a launch without starting the game.
+#[tauri::command]
+fn repair_instance(app: AppHandle, id: String, running: State<'_, Running>) -> CmdResult<()> {
+    if running.0.lock().unwrap().contains_key(&id) {
+        return Err("Сначала закройте игру".into());
+    }
+    let inst = instance::get(&id).map_err(err)?;
+    spawn_install(&app, &running, &id, move |reporter| async move { launch::repair(&inst, &reporter).await });
+    Ok(())
+}
+
+/// Runs `java -version` and returns the first line, to check a custom Java path.
+#[tauri::command]
+async fn test_java(path: String) -> CmdResult<String> {
+    let mut cmd = tokio::process::Command::new(&path);
+    cmd.arg("-version");
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let out = cmd.output().await.map_err(|e| format!("Не удалось запустить: {e}"))?;
+    // java -version prints to stderr.
+    let text = String::from_utf8_lossy(&out.stderr);
+    text.lines().next().map(str::to_string).filter(|l| !l.is_empty()).ok_or_else(|| "Это не похоже на Java".into())
+}
+
+#[tauri::command]
 fn set_mod_enabled(instance_id: String, project_id: String, enabled: bool) -> CmdResult<Instance> {
     instance::set_mod_enabled(&instance_id, &project_id, enabled).map_err(err)
 }
@@ -544,6 +606,10 @@ pub fn run() {
             import_modpack,
             export_instance,
             set_mod_enabled,
+            duplicate_instance,
+            save_instance_settings,
+            repair_instance,
+            test_java,
             launcher_version,
             check_launcher_update,
             install_launcher_update,

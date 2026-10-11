@@ -192,7 +192,13 @@ fn write_version(id: &str, json: &str) -> Result<PathBuf> {
 // ---------- Install ----------
 
 /// Installs (if needed) and returns the merged version for this loader.
-pub async fn load(kind: Kind, game_version: &str, loader_version: &str, reporter: &Reporter) -> Result<VersionJson> {
+pub async fn load(
+    kind: Kind,
+    game_version: &str,
+    loader_version: &str,
+    reporter: &Reporter,
+    reinstall: bool,
+) -> Result<VersionJson> {
     let label = kind.label();
     let installer = paths::data_dir()
         .join("meta")
@@ -222,7 +228,7 @@ pub async fn load(kind: Kind, game_version: &str, loader_version: &str, reporter
     if let Some(version_info) = profile.get("versionInfo") {
         let id = version_info["id"].as_str().ok_or_else(|| anyhow!("нет id версии"))?.to_string();
         let path = paths::versions_dir().join(&id).join(format!("{id}.json"));
-        if !installed_marker(&id).is_file() {
+        if reinstall || !installed_marker(&id).is_file() {
             report(reporter, &format!("Установка {label}"), 0, 1);
             let install = &profile["install"];
             if let (Some(file), Some(coord)) = (install["filePath"].as_str(), install["path"].as_str()) {
@@ -248,7 +254,7 @@ pub async fn load(kind: Kind, game_version: &str, loader_version: &str, reporter
     let version_value: Value = serde_json::from_str(&version_text)?;
     let id = version_value["id"].as_str().ok_or_else(|| anyhow!("нет id версии"))?.to_string();
     let version_path = paths::versions_dir().join(&id).join(format!("{id}.json"));
-    if installed_marker(&id).is_file() && version_path.is_file() {
+    if !reinstall && installed_marker(&id).is_file() && version_path.is_file() {
         return Ok(mojang::merge(vanilla, mojang::read_version_json(&version_path)?));
     }
 

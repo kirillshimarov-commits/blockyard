@@ -61,9 +61,12 @@ pub async fn loader_versions(flavor: Flavor, game_version: &str) -> Result<Vec<L
 }
 
 /// Downloads the loader profile and merges it with vanilla.
-pub async fn load(flavor: Flavor, game_version: &str, loader_version: &str) -> Result<VersionJson> {
+pub async fn load(flavor: Flavor, game_version: &str, loader_version: &str, refresh: bool) -> Result<VersionJson> {
     let id = format!("{}-{loader_version}-{game_version}", flavor.id_prefix());
     let path = paths::versions_dir().join(&id).join(format!("{id}.json"));
+    if refresh {
+        let _ = std::fs::remove_file(&path);
+    }
     if !path.is_file() {
         let url = format!(
             "{}/versions/loader/{game_version}/{loader_version}/profile/json",

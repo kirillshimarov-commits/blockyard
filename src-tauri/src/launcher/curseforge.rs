@@ -254,6 +254,22 @@ pub(crate) async fn latest_compatible(
     })
 }
 
+/// Newest file no less stable than `max_release_type` (1 release, 2 beta, 3 alpha).
+pub(crate) async fn latest_up_to(
+    mod_id: u64,
+    game_version: &str,
+    loader_type: Option<u32>,
+    max_release_type: u32,
+) -> Result<Option<File>> {
+    let mut url = format!("/mods/{mod_id}/files?pageSize=50&gameVersion={}", urlencoding::encode(game_version));
+    if let Some(t) = loader_type {
+        url.push_str(&format!("&modLoaderType={t}"));
+    }
+    let mut files: Vec<File> = get::<Envelope<Vec<File>>>(&url).await?.data;
+    files.sort_by(|a, b| b.file_date.cmp(&a.file_date));
+    Ok(files.into_iter().find(|f| f.release_type <= max_release_type))
+}
+
 pub async fn install(instance_id: &str, project_id: &str) -> Result<InstallResult> {
     let mut inst = instance::get(instance_id)?;
     let loader = inst

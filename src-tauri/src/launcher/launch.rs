@@ -25,16 +25,57 @@ pub struct Prepared {
     pub java: PathBuf,
     pub args: Vec<String>,
     pub game_dir: PathBuf,
+    pub env: Vec<(String, String)>,
+    /// Program (and its arguments) the game is started through.
+    pub wrapper: Vec<String>,
 }
 
-async fn load_version(instance: &Instance, reporter: &Reporter) -> Result<VersionJson> {
+/// Splits a command line into words, keeping "quoted parts" together.
+pub fn split_args(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    let mut has_word = false;
+    for c in s.chars() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), c) => cur.push(c),
+            (None, '"' | '\'') => {
+                quote = Some(c);
+                has_word = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if has_word || !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                    has_word = false;
+                }
+            }
+            (None, c) => cur.push(c),
+        }
+    }
+    if has_word || !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/// KEY=VALUE pairs, one per line; blank lines and lines without "=" are skipped.
+pub fn parse_env(s: &str) -> Vec<(String, String)> {
+    s.lines()
+        .filter_map(|l| l.trim().split_once('='))
+        .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+        .filter(|(k, _)| !k.is_empty())
+        .collect()
+}
+
+async fn load_version(instance: &Instance, reporter: &Reporter, repair: bool) -> Result<VersionJson> {
     let game = &instance.game_version;
     match &instance.loader {
         Loader::Vanilla => mojang::load_vanilla(game).await,
-        Loader::Fabric { version } => fabric::load(Flavor::Fabric, game, version).await,
-        Loader::Quilt { version } => fabric::load(Flavor::Quilt, game, version).await,
-        Loader::Forge { version } => forge::load(Kind::Forge, game, version, reporter).await,
-        Loader::NeoForge { version } => forge::load(Kind::NeoForge, game, version, reporter).await,
+        Loader::Fabric { version } => fabric::load(Flavor::Fabric, game, version, repair).await,
+        Loader::Quilt { version } => fabric::load(Flavor::Quilt, game, version, repair).await,
+        Loader::Forge { version } => forge::load(Kind::Forge, game, version, reporter, repair).await,
+        Loader::NeoForge { version } => forge::load(Kind::NeoForge, game, version, reporter, repair).await,
     }
 }
 
@@ -50,16 +91,36 @@ pub fn offline_session(username: &str) -> Session {
 }
 
 pub async fn prepare(instance: &Instance, session: &Session, reporter: &Reporter) -> Result<Prepared> {
+    prepare_inner(instance, session, reporter, false).await
+}
+
+/// Re-downloads loader profiles, re-runs loader installation and re-extracts natives.
+/// Game files with known hashes are re-checked on every launch anyway.
+pub async fn repair(instance: &Instance, reporter: &Reporter) -> Result<()> {
+    let _ = std::fs::remove_dir_all(instance.natives_dir());
+    prepare_inner(instance, &offline_session("Player"), reporter, true).await.map(|_| ())
+}
+
+async fn prepare_inner(instance: &Instance, session: &Session, reporter: &Reporter, repair: bool) -> Result<Prepared> {
     let username = session.username.as_str();
     report(reporter, "Подготовка", 0, 1);
-    let version = load_version(instance, reporter).await.context("не удалось загрузить данные версии")?;
+    let version = load_version(instance, reporter, repair).await.context("не удалось загрузить данные версии")?;
     let game_dir = instance.game_dir();
     let natives_dir = instance.natives_dir();
     std::fs::create_dir_all(&game_dir)?;
 
     let layout = mojang::install_files(&version, &natives_dir, &game_dir, reporter).await?;
     let major = version.java_version.as_ref().map_or(8, |j| j.major_version);
-    let java = java::ensure_java(major, reporter).await?;
+    let settings = &instance.settings;
+    let java = if settings.java_path.trim().is_empty() {
+        java::ensure_java(major, reporter).await?
+    } else {
+        let custom = PathBuf::from(settings.java_path.trim());
+        if !custom.is_file() {
+            anyhow::bail!("Java не найдена по пути {} (настройки сборки → Java и память)", custom.display());
+        }
+        custom
+    };
 
     // Classpath: libraries, then the client jar.
     let libs = mojang::resolve_libraries(&version);
@@ -124,6 +185,7 @@ pub async fn prepare(instance: &Instance, session: &Session, reporter: &Reporter
     };
 
     let mut args = vec![format!("-Xmx{}M", instance.memory_mb), "-Xms512M".to_string()];
+    args.extend(split_args(&settings.jvm_args));
     match &version.arguments {
         Some(a) if !a.jvm.is_empty() => args.extend(expand(&a.jvm)),
         // Old versions have no JVM arguments in their JSON.
@@ -140,13 +202,33 @@ pub async fn prepare(instance: &Instance, session: &Session, reporter: &Reporter
         (None, None) => {}
     }
 
-    Ok(Prepared { java, args, game_dir })
+    if settings.fullscreen {
+        args.push("--fullscreen".into());
+    } else if let (Some(w), Some(h)) = (settings.width, settings.height) {
+        args.extend(["--width".into(), w.to_string(), "--height".into(), h.to_string()]);
+    }
+
+    Ok(Prepared {
+        java,
+        args,
+        game_dir,
+        env: parse_env(&settings.env_vars),
+        wrapper: split_args(&settings.wrapper),
+    })
 }
 
 /// Starts the game. stdout/stderr are piped so the UI can show the log.
 pub fn spawn(prepared: &Prepared) -> Result<Child> {
-    let mut cmd = Command::new(&prepared.java);
+    let mut cmd = match prepared.wrapper.split_first() {
+        Some((program, wrapper_args)) => {
+            let mut c = Command::new(program);
+            c.args(wrapper_args).arg(&prepared.java);
+            c
+        }
+        None => Command::new(&prepared.java),
+    };
     cmd.args(&prepared.args)
+        .envs(prepared.env.iter().map(|(k, v)| (k, v)))
         .current_dir(&prepared.game_dir)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -159,6 +241,29 @@ pub fn spawn(prepared: &Prepared) -> Result<Child> {
     cmd.spawn().context("не удалось запустить Java")
 }
 
+/// Runs a user hook through the system shell in the game folder and waits for it.
+pub async fn run_hook(command: &str, game_dir: &std::path::Path) -> Result<()> {
+    let mut cmd = if cfg!(target_os = "windows") {
+        let mut c = Command::new("cmd");
+        c.arg("/C").arg(command);
+        c
+    } else {
+        let mut c = Command::new("sh");
+        c.arg("-c").arg(command);
+        c
+    };
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let status = cmd.current_dir(game_dir).status().await.context("не удалось выполнить команду")?;
+    if !status.success() {
+        anyhow::bail!("команда «{command}» завершилась с кодом {}", status.code().unwrap_or(-1));
+    }
+    Ok(())
+}
+
 pub fn mark_played(instance: &mut Instance) -> Result<()> {
     instance.last_played = Some(now());
     instance.save()
@@ -167,6 +272,13 @@ pub fn mark_played(instance: &mut Instance) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn splits_command_lines() {
+        assert_eq!(split_args(r#"-Xss2M -Dfoo="a b" ''"#), vec!["-Xss2M", "-Dfoo=a b", ""]);
+        assert!(split_args("   ").is_empty());
+        assert_eq!(parse_env("A=1\n\nB = two words\nbad"), vec![("A".into(), "1".into()), ("B".into(), "two words".into())]);
+    }
 
     #[test]
     fn offline_uuid_matches_vanilla() {

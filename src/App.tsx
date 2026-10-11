@@ -248,6 +248,7 @@ export default function App() {
           <InstanceView
             key={view.id}
             instance={instances.find((i) => i.id === view.id)}
+            instances={instances}
             status={status[view.id]}
             logs={logs[view.id] ?? []}
             onPlay={() => play(view.id)}
@@ -257,6 +258,10 @@ export default function App() {
             onDeleted={() => {
               refresh();
               setView({ kind: "library" });
+            }}
+            onDuplicated={(copy) => {
+              setInstances((list) => [copy, ...list]);
+              setView({ kind: "instance", id: copy.id });
             }}
             notify={notify}
           />

@@ -8,9 +8,11 @@ import PendingDownloadsModal from "../components/PendingDownloadsModal";
 import InstanceCover from "../components/InstanceCover";
 import ContentList from "../components/ContentList";
 import UpdatesModal from "../components/UpdatesModal";
+import InstanceSettingsModal from "../components/InstanceSettingsModal";
 
 interface Props {
   instance?: Instance;
+  instances: Instance[];
   status?: GameStatus;
   logs: string[];
   onPlay: () => void;
@@ -18,19 +20,21 @@ interface Props {
   onBrowse: (content: "mod" | "shader" | "resourcepack") => void;
   onChanged: (inst: Instance) => void;
   onDeleted: () => void;
+  onDuplicated: (inst: Instance) => void;
   notify: (text: string, error?: boolean) => void;
 }
 
-type Tab = "mods" | "shaders" | "resourcepacks" | "log" | "options";
+type Tab = "mods" | "shaders" | "resourcepacks" | "log";
 
 export default function InstanceView(props: Props) {
-  const { instance, status, logs, onPlay, onStop, onBrowse, onChanged, onDeleted, notify } = props;
+  const { instance, instances, status, logs, onPlay, onStop, onBrowse, onChanged, onDeleted, onDuplicated, notify } =
+    props;
+  const [showSettings, setShowSettings] = useState(false);
   const [tab, setTab] = useState<Tab>("mods");
   const [showPending, setShowPending] = useState(false);
   const [playAfterPending, setPlayAfterPending] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
-  const saveTimer = useRef<number | undefined>(undefined);
   const prevState = useRef<string | undefined>(undefined);
   const state = status?.state ?? "stopped";
   const pendingCount = instance?.pending.length ?? 0;
@@ -95,15 +99,6 @@ export default function InstanceView(props: Props) {
     }
   }
 
-  async function remove() {
-    if (!window.confirm(`Удалить сборку «${instance!.name}» вместе с мирами и модами?`)) return;
-    try {
-      await api.deleteInstance(instance!.id);
-      onDeleted();
-    } catch (e) {
-      notify(errorText(e), true);
-    }
-  }
 
   return (
     <div className="page">
@@ -116,6 +111,9 @@ export default function InstanceView(props: Props) {
             {instance.modpack ? ` · модпак «${instance.modpack.title}»` : ""}
           </p>
         </div>
+        <button className="btn icon" title="Настройки сборки" onClick={() => setShowSettings(true)}>
+          <Icon name="gear" />
+        </button>
         <button className="btn icon" title="Экспорт в .mrpack (поделиться сборкой)" onClick={exportPack}>
           <Icon name="share" />
         </button>
@@ -201,9 +199,6 @@ export default function InstanceView(props: Props) {
         </button>
         <button className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>
           Журнал
-        </button>
-        <button className={tab === "options" ? "on" : ""} onClick={() => setTab("options")}>
-          Настройки
         </button>
       </div>
 
@@ -327,41 +322,27 @@ export default function InstanceView(props: Props) {
         </pre>
       )}
 
-      {tab === "options" && (
-        <div className="options">
-          <label className="field">
-            <span>Оперативная память: {instance.memoryMb} МБ</span>
-            <input
-              type="range"
-              min={1024}
-              max={16384}
-              step={512}
-              value={instance.memoryMb}
-              onChange={(e) => {
-                const memoryMb = Number(e.target.value);
-                onChanged({ ...instance, memoryMb });
-                window.clearTimeout(saveTimer.current);
-                saveTimer.current = window.setTimeout(
-                  () =>
-                    api
-                      .setInstanceMemory(instance.id, memoryMb)
-                      .then(onChanged)
-                      .catch((err) => notify(errorText(err), true)),
-                  400,
-                );
-              }}
-            />
-          </label>
-          <div className="danger-zone">
-            <div>
-              <strong>Удалить сборку</strong>
-              <p className="muted small">Миры, моды и настройки этой сборки будут удалены без возможности восстановления.</p>
-            </div>
-            <button className="btn danger" disabled={state !== "stopped"} onClick={remove}>
-              <Icon name="trash" /> Удалить
-            </button>
-          </div>
-        </div>
+      {showSettings && (
+        <InstanceSettingsModal
+          instance={instance}
+          instances={instances}
+          busy={state !== "stopped"}
+          onClose={() => setShowSettings(false)}
+          onChanged={onChanged}
+          onDuplicated={(copy) => {
+            setShowSettings(false);
+            onDuplicated(copy);
+          }}
+          onDeleted={onDeleted}
+          onRepair={() => {
+            setShowSettings(false);
+            api
+              .repairInstance(instance.id)
+              .then(() => notify("Исправляю сборку…"))
+              .catch((e) => notify(errorText(e), true));
+          }}
+          notify={notify}
+        />
       )}
     </div>
   );

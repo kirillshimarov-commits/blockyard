@@ -355,7 +355,7 @@ async fn install_curseforge(inst: &mut Instance, archive: &Path, reporter: &Repo
     // Make sure Fabric/Quilt versions resolve (and surface errors before the big download).
     if let Loader::Fabric { version } | Loader::Quilt { version } = &inst.loader {
         let flavor = if matches!(inst.loader, Loader::Fabric { .. }) { Flavor::Fabric } else { Flavor::Quilt };
-        fabric::load(flavor, &game, version).await?;
+        fabric::load(flavor, &game, version, false).await?;
     }
     inst.save()?;
 

@@ -99,6 +99,44 @@ pub struct Instance {
     pub icon_url: Option<String>,
     #[serde(default)]
     pub modpack: Option<ModpackRef>,
+    #[serde(default)]
+    pub settings: InstanceSettings,
+}
+
+/// Per-instance options from the settings dialog. Empty strings mean "not set".
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct InstanceSettings {
+    /// Library section the instance is shown in.
+    pub group: String,
+    /// Which mod releases count as updates: "release", "beta" or "alpha".
+    pub update_channel: String,
+    /// Java executable to use instead of the automatically downloaded one.
+    pub java_path: String,
+    /// Extra JVM arguments, e.g. "-XX:+UseG1GC".
+    pub jvm_args: String,
+    /// Environment variables, one KEY=VALUE per line.
+    pub env_vars: String,
+    pub fullscreen: bool,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    /// Shell command run before the game starts; a failure cancels the launch.
+    pub pre_launch: String,
+    /// Program the game is started through, e.g. "prime-run".
+    pub wrapper: String,
+    /// Shell command run after the game exits.
+    pub post_exit: String,
+}
+
+impl InstanceSettings {
+    /// Release types allowed by the update channel, most stable first.
+    pub fn allowed_release_types(&self) -> &'static [&'static str] {
+        match self.update_channel.as_str() {
+            "alpha" => &["release", "beta", "alpha"],
+            "beta" => &["release", "beta"],
+            _ => &["release"],
+        }
+    }
 }
 
 impl Instance {
@@ -181,6 +219,7 @@ pub fn create(name: &str, game_version: &str, loader: Loader, memory_mb: u32) ->
         resourcepacks: Vec::new(),
         icon_url: None,
         modpack: None,
+        settings: InstanceSettings::default(),
     };
     instance.save()?;
     Ok(instance)
@@ -230,4 +269,64 @@ pub fn set_mod_enabled(id: &str, project_id: &str, enabled: bool) -> Result<Inst
     }
     instance.save()?;
     Ok(instance)
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let dest = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir(&entry.path(), &dest)?;
+        } else {
+            std::fs::copy(entry.path(), dest)?;
+        }
+    }
+    Ok(())
+}
+
+/// Copies an instance with its worlds, mods and settings under a new id.
+pub fn duplicate(id: &str) -> Result<Instance> {
+    let source = get(id)?;
+    let mut copy = source.clone();
+    copy.id = uuid::Uuid::new_v4().to_string();
+    copy.name = format!("{} (копия)", source.name);
+    copy.created_at = now();
+    copy.last_played = None;
+    copy_dir(&source.game_dir(), &copy.game_dir())?;
+    copy.save()?;
+    Ok(copy)
+}
+
+/// Fields the settings dialog can change.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstancePatch {
+    pub name: String,
+    pub icon_url: Option<String>,
+    pub memory_mb: u32,
+    pub game_version: String,
+    pub loader: Loader,
+    pub settings: InstanceSettings,
+}
+
+pub fn apply_patch(id: &str, patch: InstancePatch) -> Result<Instance> {
+    let mut inst = get(id)?;
+    let name = patch.name.trim();
+    if name.is_empty() {
+        bail!("укажите название сборки");
+    }
+    if let Some(icon) = &patch.icon_url {
+        if !(icon.starts_with("https://") || icon.starts_with("data:image/")) {
+            bail!("недопустимая иконка");
+        }
+    }
+    inst.name = name.to_string();
+    inst.icon_url = patch.icon_url;
+    inst.memory_mb = patch.memory_mb.clamp(512, 65536);
+    inst.game_version = patch.game_version;
+    inst.loader = patch.loader;
+    inst.settings = patch.settings;
+    inst.save()?;
+    Ok(inst)
 }

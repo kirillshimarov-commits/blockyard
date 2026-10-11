@@ -1099,3 +1099,176 @@ input[type="range"]::-webkit-slider-thumb {
 :root[data-compact="true"] .update-banner span {
   display: none;
 }
+
+/* ---------- Instance settings dialog ---------- */
+
+.modal.settings-modal {
+  width: min(900px, calc(100vw - 48px));
+  height: min(640px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.settings-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 16px;
+}
+.settings-modal-header .instance-cover {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+.settings-modal-header .close {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+.settings-modal-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.settings-nav {
+  width: 210px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
+}
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  font-weight: 600;
+}
+.settings-nav button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.settings-nav button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-content h4 {
+  margin: 16px 0 4px;
+  font-size: 14px;
+}
+.settings-content > :first-child h4:first-child,
+.settings-content > h4:first-child {
+  margin-top: 0;
+}
+.settings-content p.small {
+  margin: 2px 0 0;
+}
+.settings-modal .modal-actions {
+  margin: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+.settings-content .btn {
+  align-self: flex-start;
+}
+.row.top {
+  align-items: flex-start;
+}
+.icon-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.icon-picker .label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.icon-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+.icon-button:hover {
+  outline: 2px solid var(--accent);
+}
+.chips {
+  display: flex;
+  gap: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  cursor: pointer;
+  font-weight: 600;
+}
+.chip.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.java-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.memory-input {
+  width: 90px !important;
+  text-align: right;
+}
+textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.5 "Cascadia Mono", Consolas, monospace;
+  resize: vertical;
+  outline: none;
+}
+textarea:focus {
+  border-color: var(--accent);
+}
+.library-group + .library-group {
+  margin-top: 8px;
+}
+.library-group h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}

@@ -32,6 +32,30 @@ export interface Instance {
   resourcepacks: InstalledMod[];
   iconUrl?: string | null;
   modpack?: { source: Source; projectId: string; versionId: string; title: string } | null;
+  settings: InstanceSettings;
+}
+
+export interface InstanceSettings {
+  group: string;
+  updateChannel: "" | "release" | "beta" | "alpha";
+  javaPath: string;
+  jvmArgs: string;
+  envVars: string;
+  fullscreen: boolean;
+  width?: number | null;
+  height?: number | null;
+  preLaunch: string;
+  wrapper: string;
+  postExit: string;
+}
+
+export interface InstancePatch {
+  name: string;
+  iconUrl?: string | null;
+  memoryMb: number;
+  gameVersion: string;
+  loader: Loader;
+  settings: InstanceSettings;
 }
 
 export interface PendingDownload {
@@ -178,6 +202,10 @@ export const api = {
   installModpack: (source: Source, projectId: string) => invoke<Instance>("install_modpack", { source, projectId }),
   importModpack: (path: string) => invoke<Instance>("import_modpack", { path }),
   exportInstance: (instanceId: string, path: string) => invoke<void>("export_instance", { instanceId, path }),
+  duplicateInstance: (id: string) => invoke<Instance>("duplicate_instance", { id }),
+  saveInstanceSettings: (id: string, patch: InstancePatch) => invoke<Instance>("save_instance_settings", { id, patch }),
+  repairInstance: (id: string) => invoke<void>("repair_instance", { id }),
+  testJava: (path: string) => invoke<string>("test_java", { path }),
   setModEnabled: (instanceId: string, projectId: string, enabled: boolean) =>
     invoke<Instance>("set_mod_enabled", { instanceId, projectId, enabled }),
   launcherVersion: () => invoke<string>("launcher_version"),

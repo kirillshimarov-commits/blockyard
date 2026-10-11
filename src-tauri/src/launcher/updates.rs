@@ -65,9 +65,20 @@ pub async fn check(instance_id: &str) -> Result<Vec<ModUpdate>> {
             .error_for_status()?
             .json()
             .await?;
+        let types = inst.settings.allowed_release_types();
+        let loaders = modrinth::compatible_loaders(loader);
         for (hash, version) in latest {
             let Some(&i) = by_hash.get(&hash) else { continue };
             let m = &inst.mods[i];
+            // The bulk endpoint ignores release channels; look up a suitable version instead.
+            let version = if version.version_type.is_empty() || types.contains(&version.version_type.as_str()) {
+                version
+            } else {
+                match modrinth::latest_of_types(&m.project_id, &inst.game_version, &loaders, types).await {
+                    Ok(Some(v)) => v,
+                    _ => continue,
+                }
+            };
             if version.id == m.version_id {
                 continue;
             }
@@ -90,12 +101,13 @@ pub async fn check(instance_id: &str) -> Result<Vec<ModUpdate>> {
         let loader_type = curseforge::loader_type(loader);
         let cf_mods: Vec<_> = inst.mods.iter().filter(|m| m.source == Source::Curseforge).cloned().collect();
         let game = inst.game_version.clone();
+        let max_release_type = inst.settings.allowed_release_types().len() as u32;
         let found: Vec<Option<ModUpdate>> = futures::stream::iter(cf_mods)
             .map(|m| {
                 let game = game.clone();
                 async move {
                     let id: u64 = m.project_id.parse().ok()?;
-                    let file = curseforge::latest_compatible(id, Some(&game), loader_type).await.ok()??;
+                    let file = curseforge::latest_up_to(id, &game, loader_type, max_release_type).await.ok()??;
                     let url = file.download_url.clone()?;
                     (file.id.to_string() != m.version_id && mods::check_file_name(&file.file_name).is_ok()).then(|| {
                         ModUpdate {

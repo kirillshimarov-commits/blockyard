@@ -44,6 +44,9 @@ pub(crate) struct Version {
     pub(crate) files: Vec<VersionFile>,
     #[serde(default)]
     pub(crate) game_versions: Vec<String>,
+    /// "release", "beta" or "alpha".
+    #[serde(default)]
+    pub(crate) version_type: String,
     #[serde(default)]
     pub(crate) dependencies: Vec<Dependency>,
 }
@@ -157,6 +160,23 @@ pub(crate) async fn latest_version(
     let versions: Vec<Version> = http::get_json(&url).await?;
     // Modrinth returns versions newest first.
     Ok(versions.into_iter().next())
+}
+
+/// Newest version whose release type is allowed by the instance's update channel.
+pub(crate) async fn latest_of_types(
+    project_id: &str,
+    game_version: &str,
+    loaders: &[&str],
+    types: &[&str],
+) -> Result<Option<Version>> {
+    let url = format!(
+        "{API_URL}/project/{}/version?loaders={}&game_versions={}",
+        enc(project_id),
+        enc(&serde_json::to_string(loaders)?),
+        enc(&format!("[\"{game_version}\"]")),
+    );
+    let versions: Vec<Version> = http::get_json(&url).await?;
+    Ok(versions.into_iter().find(|v| types.contains(&v.version_type.as_str())))
 }
 
 pub(crate) async fn project(id_or_slug: &str) -> Result<Project> {
