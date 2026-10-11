@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Account, api, ContentKind, LauncherUpdate, TunnelStatus, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
 import Library from "./pages/Library";
+import Home from "./pages/Home";
+import SpaceScene from "./components/SpaceScene";
+import Splash from "./components/Splash";
+import LaunchOverlay from "./components/LaunchOverlay";
 import InstanceView from "./pages/InstanceView";
 import Browse from "./pages/Browse";
 import SettingsPage from "./pages/Settings";
@@ -33,6 +37,22 @@ export interface GameStatus {
 
 const MAX_LOG_LINES = 3000;
 
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(new Date()), 10_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const time = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const day = now.toLocaleDateString("ru-RU", { weekday: "long" });
+  return (
+    <span className="clock" title={now.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}>
+      {time}
+      <span className="clock-day">, {day.charAt(0).toUpperCase() + day.slice(1)}</span>
+    </span>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState<View>({ kind: "library" });
   const [instances, setInstances] = useState<Instance[]>([]);
@@ -45,6 +65,11 @@ export default function App() {
   const [launcherUpdate, setLauncherUpdate] = useState<LauncherUpdate | null>(null);
   const [tunnel, setTunnel] = useState<TunnelStatus>({ lanPorts: {} });
   const [joining, setJoining] = useState(false);
+  const [launching, setLaunching] = useState<string | null>(null);
+  /** null until the appearance is loaded, so the intro does not flash for people who turned it off. */
+  const [splash, setSplash] = useState<boolean | null>(null);
+  const hideSplash = useCallback(() => setSplash(false), []);
+  const hideLaunch = useCallback(() => setLaunching(null), []);
 
   const refreshTunnel = useCallback(() => {
     api.tunnelStatus().then(setTunnel).catch(() => {});
@@ -89,6 +114,7 @@ export default function App() {
   useEffect(() => {
     loadAppearance().then(async (a) => {
       setAppearance(a);
+      setSplash(a.splash && a.animations && a.layout === "console");
       setActiveEffect(await applyWindowStyle(a));
     });
   }, []);
@@ -170,9 +196,11 @@ export default function App() {
     async (id: string) => {
       try {
         setStatus((s) => ({ ...s, [id]: { state: "installing" } }));
+        setLaunching(id);
         await api.launch(id);
       } catch (e) {
         setStatus((s) => ({ ...s, [id]: { state: "stopped" } }));
+        setLaunching(null);
         notify(errorText(e), true);
       }
     },
@@ -180,7 +208,7 @@ export default function App() {
   );
 
   const nav: { key: string; view: View; label: string; icon: IconName }[] = [
-    { key: "library", view: { kind: "library" }, label: "Библиотека", icon: "grid" },
+    { key: "library", view: { kind: "library" }, label: appearance.layout === "console" ? "Главная" : "Библиотека", icon: "grid" },
     { key: "mod", view: { kind: "browse", content: "mod" }, label: "Моды", icon: "puzzle" },
     { key: "shader", view: { kind: "browse", content: "shader" }, label: "Шейдеры", icon: "sun" },
     { key: "resourcepack", view: { kind: "browse", content: "resourcepack" }, label: "Ресурспаки", icon: "image" },
@@ -189,9 +217,100 @@ export default function App() {
   ];
   const active = view.kind === "instance" ? "library" : view.kind === "browse" ? view.content : view.kind;
 
+  const consoleLayout = appearance.layout === "console";
+  const viewKey = view.kind === "instance" ? `i-${view.id}` : view.kind === "browse" ? `b-${view.content}` : view.kind;
+  const launchingInstance = launching ? instances.find((i) => i.id === launching) : undefined;
+
+  const guestBanner = tunnel.guest && (
+    <div className={`guest-banner ${tunnel.guest.connected ? "" : "lost"}`}>
+      <span>
+        {tunnel.guest.connected ? "В мире друга" : "Связь с другом потеряна"}
+        <br />
+        <small className="muted">{linkLabel(tunnel.guest.link)}</small>
+      </span>
+      <button
+        className="btn small-btn"
+        onClick={() =>
+          api
+            .tunnelLeave()
+            .then(refreshTunnel)
+            .catch(() => {})
+        }
+      >
+        Отключиться
+      </button>
+    </div>
+  );
+
   return (
-    <div className="app">
+    <div className={`app ${consoleLayout ? "console" : ""}`}>
       <div className="app-bg" />
+      {consoleLayout && appearance.spaceScene && <SpaceScene accent={appearance.accent} animate={appearance.animations} />}
+      {consoleLayout && (
+        <header className="topbar">
+          <nav className="topbar-tabs">
+            {nav
+              .filter((item) => item.key !== "settings")
+              .map((item) => (
+                <button
+                  key={item.key}
+                  className={`tab-pill ${active === item.key ? "active" : ""}`}
+                  onClick={() => setView(item.view)}
+                >
+                  {item.label}
+                </button>
+              ))}
+          </nav>
+          <div className="topbar-right">
+            {tunnel.guest && (
+              <span className={`status-chip ${tunnel.guest.connected ? "" : "lost"}`} title={linkLabel(tunnel.guest.link)}>
+                <span className="dot" data-state={tunnel.guest.connected ? "running" : "stopped"} />
+                {tunnel.guest.connected ? "В мире друга" : "Связь потеряна"}
+                <button
+                  className="link small"
+                  onClick={() =>
+                    api
+                      .tunnelLeave()
+                      .then(refreshTunnel)
+                      .catch(() => {})
+                  }
+                >
+                  Выйти
+                </button>
+              </span>
+            )}
+            {launcherUpdate && (
+              <button className="status-chip accent" disabled={updating} onClick={installUpdate} title="Скачать и установить">
+                {updating ? <span className="spinner" /> : <Icon name="download" size={14} />}
+                {updating ? "Скачиваю…" : `Обновить до ${launcherUpdate.version}`}
+              </button>
+            )}
+            <button className="icon-btn" title="Сетевая игра: зайти в мир друга" onClick={() => setJoining(true)}>
+              <Icon name="users" />
+            </button>
+            <button
+              className={`icon-btn ${view.kind === "settings" ? "active" : ""}`}
+              title="Настройки"
+              onClick={() => setView({ kind: "settings" })}
+            >
+              <Icon name="gear" />
+            </button>
+            <button
+              className="avatar-btn"
+              title={`${activeAccount?.username ?? settings?.username ?? ""} · ${activeAccount ? "Microsoft" : "офлайн"}`}
+              onClick={() => setView({ kind: "settings" })}
+            >
+              {activeAccount ? (
+                <img src={`https://mc-heads.net/avatar/${activeAccount.uuid}/32`} alt="" />
+              ) : (
+                (settings?.username.slice(0, 1).toUpperCase() ?? "?")
+              )}
+            </button>
+            <Clock />
+          </div>
+        </header>
+      )}
+      {!consoleLayout && (
       <aside className="sidebar">
         <div className="brand">
           <img src="/logo.svg" alt="" />
@@ -225,26 +344,7 @@ export default function App() {
             ))}
           </div>
         )}
-        {tunnel.guest && (
-          <div className={`guest-banner ${tunnel.guest.connected ? "" : "lost"}`}>
-            <span>
-              {tunnel.guest.connected ? "В мире друга" : "Связь с другом потеряна"}
-              <br />
-              <small className="muted">{linkLabel(tunnel.guest.link)}</small>
-            </span>
-            <button
-              className="btn small-btn"
-              onClick={() =>
-                api
-                  .tunnelLeave()
-                  .then(refreshTunnel)
-                  .catch(() => {})
-              }
-            >
-              Отключиться
-            </button>
-          </div>
-        )}
+        {guestBanner}
         {launcherUpdate && (
           <div className="update-banner" title={`Доступна версия ${launcherUpdate.version}`}>
             <span>
@@ -268,9 +368,24 @@ export default function App() {
           </div>
         </div>
       </aside>
+      )}
 
       <main className="content">
-        {view.kind === "library" && (
+        <div className="view-anim" key={viewKey}>
+        {view.kind === "library" && consoleLayout && (
+          <Home
+            instances={instances}
+            status={status}
+            onOpen={(id) => setView({ kind: "instance", id })}
+            onPlay={play}
+            onStop={(id) => api.stop(id)}
+            onJoinFriend={() => setJoining(true)}
+            onBrowseModpacks={() => setView({ kind: "browse", content: "modpack" })}
+            onCreated={(inst) => setInstances((list) => [inst, ...list])}
+            notify={notify}
+          />
+        )}
+        {view.kind === "library" && !consoleLayout && (
           <Library
             instances={instances}
             status={status}
@@ -333,6 +448,7 @@ export default function App() {
             notify={notify}
           />
         )}
+        </div>
       </main>
 
       {joining && (
@@ -347,6 +463,11 @@ export default function App() {
           }}
         />
       )}
+
+      {consoleLayout && launchingInstance && (
+        <LaunchOverlay instance={launchingInstance} status={status[launchingInstance.id]} onClose={hideLaunch} />
+      )}
+      {splash && <Splash name={activeAccount?.username ?? settings?.username ?? ""} onDone={hideSplash} />}
 
       {toast && <div className={`toast ${toast.error ? "error" : ""}`}>{toast.text}</div>}
     </div>

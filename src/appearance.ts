@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 export type ThemeMode = "system" | "dark" | "light";
 export type WindowEffect = "auto" | "mica" | "acrylic" | "blur" | "none";
 export type Background = "window" | "gradient" | "image";
+export type Layout = "console" | "classic";
 
 export interface Appearance {
   theme: ThemeMode;
@@ -21,6 +22,12 @@ export interface Appearance {
   scale: number;
   animations: boolean;
   compactSidebar: boolean;
+  /** Console: top bar, tile row and big cards. Classic: sidebar. */
+  layout: Layout;
+  /** Animated starfield with light beams behind the console layout. */
+  spaceScene: boolean;
+  /** Intro animation when the launcher opens. */
+  splash: boolean;
 }
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -37,6 +44,9 @@ export const DEFAULT_APPEARANCE: Appearance = {
   scale: 100,
   animations: true,
   compactSidebar: false,
+  layout: "console",
+  spaceScene: true,
+  splash: true,
 };
 
 export const ACCENTS = [
@@ -112,6 +122,8 @@ export function applyAppearance(a: Appearance, activeEffect: string) {
   root.dataset.translucent = String(translucent);
   root.dataset.animations = String(a.animations);
   root.dataset.compact = String(a.compactSidebar);
+  root.dataset.layout = a.layout;
+  root.dataset.space = String(a.layout === "console" && a.spaceScene);
 
   const set = (k: string, v: string) => root.style.setProperty(k, v);
   set("--accent", a.accent);

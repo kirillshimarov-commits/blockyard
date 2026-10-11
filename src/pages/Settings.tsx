@@ -11,6 +11,7 @@ import {
   GRADIENTS,
   ThemeMode,
   WindowEffect,
+  Layout,
 } from "../appearance";
 
 interface Props {
@@ -34,6 +35,11 @@ const EFFECTS: { value: WindowEffect; label: string }[] = [
   { value: "acrylic", label: "Acrylic" },
   { value: "blur", label: "Размытие" },
   { value: "none", label: "Выкл" },
+];
+
+const LAYOUTS: { value: Layout; label: string }[] = [
+  { value: "console", label: "Консоль" },
+  { value: "classic", label: "Классический" },
 ];
 
 const BACKGROUNDS: { value: Background; label: string }[] = [
@@ -258,6 +264,26 @@ export default function SettingsPage(props: Props) {
         </div>
 
         <div className="field">
+          <span>Стиль интерфейса</span>
+          <Segmented options={LAYOUTS} value={a.layout} onChange={(v) => set("layout", v)} />
+          <span className="muted small">
+            «Консоль» — главная с плитками сборок и большой карточкой, как на PS5. «Классический» — боковая панель.
+          </span>
+        </div>
+        {a.layout === "console" && (
+          <>
+            <label className="checkbox">
+              <input type="checkbox" checked={a.spaceScene} onChange={(e) => set("spaceScene", e.target.checked)} />
+              Космический фон со звёздами и лучами света
+            </label>
+            <label className="checkbox">
+              <input type="checkbox" checked={a.splash} onChange={(e) => set("splash", e.target.checked)} />
+              Заставка при запуске лаунчера
+            </label>
+          </>
+        )}
+
+        <div className="field">
           <span>Тема</span>
           <Segmented options={THEMES} value={a.theme} onChange={(v) => set("theme", v)} />
         </div>
@@ -347,14 +373,16 @@ export default function SettingsPage(props: Props) {
           <input type="checkbox" checked={a.animations} onChange={(e) => set("animations", e.target.checked)} />
           Анимации
         </label>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={a.compactSidebar}
-            onChange={(e) => set("compactSidebar", e.target.checked)}
-          />
-          Компактная боковая панель (только иконки)
-        </label>
+        {a.layout === "classic" && (
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={a.compactSidebar}
+              onChange={(e) => set("compactSidebar", e.target.checked)}
+            />
+            Компактная боковая панель (только иконки)
+          </label>
+        )}
       </section>
     </div>
   );
