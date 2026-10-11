@@ -21,6 +21,14 @@ use tokio::sync::Notify;
 type CmdResult<T> = Result<T, String>;
 
 fn err(e: anyhow::Error) -> String {
+    // Windows "sharing violation": a file of the instance is held by a game that is still running.
+    let locked = e.chain().any(|c| c.downcast_ref::<std::io::Error>().and_then(|io| io.raw_os_error()) == Some(32));
+    if locked {
+        return format!(
+            "Файлы сборки заняты: похоже, эта игра ещё запущена, возможно без окна. \
+             Закройте Minecraft или завершите процесс Java (javaw.exe) в диспетчере задач и попробуйте снова.\n\n{e:#}"
+        );
+    }
     format!("{e:#}")
 }
 
@@ -775,6 +783,8 @@ pub fn run() {
                         }
                     }
                     WindowEvent::Focused(true) => launcher::embed::focus(),
+                    // Closing the launcher must not take the game's window with it.
+                    WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => launcher::embed::detach_all(),
                     _ => {}
                 });
             }

@@ -345,7 +345,12 @@ pub fn extract_natives(libs: &[ResolvedLibrary], dir: &Path) -> Result<()> {
             let Some(file_name) = Path::new(&name).file_name() else { continue };
             let mut buf = Vec::new();
             entry.read_to_end(&mut buf)?;
-            std::fs::write(dir.join(file_name), buf)?;
+            let target = dir.join(file_name);
+            // Unchanged libraries are left alone: a running game keeps them locked on Windows.
+            if std::fs::read(&target).ok().as_deref() == Some(buf.as_slice()) {
+                continue;
+            }
+            std::fs::write(&target, buf)?;
         }
     }
     Ok(())

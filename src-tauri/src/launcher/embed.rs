@@ -16,8 +16,8 @@ mod imp {
         WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME, WS_VISIBLE,
     };
 
-    /// Embedded game windows, as raw handles (HWND is a pointer and not Send).
-    static EMBEDDED: Mutex<Vec<isize>> = Mutex::new(Vec::new());
+    /// Embedded game windows with their original styles, as raw handles (HWND is a pointer and not Send).
+    static EMBEDDED: Mutex<Vec<(isize, isize, isize)>> = Mutex::new(Vec::new());
 
     struct Search {
         pid: u32,
@@ -66,26 +66,44 @@ mod imp {
 
     pub fn attach(game: isize, parent: isize) {
         let (game, parent) = (game as HWND, parent as HWND);
+        let (old_style, old_ex) = unsafe { (GetWindowLongPtrW(game, GWL_STYLE), GetWindowLongPtrW(game, GWL_EXSTYLE)) };
         unsafe {
-            let style = GetWindowLongPtrW(game, GWL_STYLE) as u32;
+            let style = old_style as u32;
             let style = (style & !(WS_POPUP | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX))
                 | WS_CHILD
                 | WS_VISIBLE;
             SetWindowLongPtrW(game, GWL_STYLE, style as isize);
-            let ex = GetWindowLongPtrW(game, GWL_EXSTYLE) as u32;
+            let ex = old_ex as u32;
             let ex = ex & !(WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_DLGMODALFRAME);
             SetWindowLongPtrW(game, GWL_EXSTYLE, ex as isize);
             SetParent(game, parent);
         }
         fit(game, parent);
         unsafe { SetFocus(game) };
-        EMBEDDED.lock().unwrap().push(game as isize);
+        EMBEDDED.lock().unwrap().push((game as isize, old_style, old_ex));
     }
 
     fn alive() -> Vec<HWND> {
         let mut list = EMBEDDED.lock().unwrap();
-        list.retain(|&h| unsafe { IsWindow(h as HWND) } != 0);
-        list.iter().map(|&h| h as HWND).collect()
+        list.retain(|&(h, _, _)| unsafe { IsWindow(h as HWND) } != 0);
+        list.iter().map(|&(h, _, _)| h as HWND).collect()
+    }
+
+    /// Gives every embedded game its own window back (before the launcher window goes away).
+    pub fn detach_all() {
+        let list: Vec<_> = EMBEDDED.lock().unwrap().drain(..).collect();
+        for (h, style, ex) in list {
+            let game = h as HWND;
+            if unsafe { IsWindow(game) } == 0 {
+                continue;
+            }
+            unsafe {
+                SetParent(game, std::ptr::null_mut());
+                SetWindowLongPtrW(game, GWL_STYLE, style);
+                SetWindowLongPtrW(game, GWL_EXSTYLE, ex);
+                SetWindowPos(game, std::ptr::null_mut(), 80, 80, 1280, 720, SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+            }
+        }
     }
 
     pub fn resize_all(parent: isize) {
@@ -109,6 +127,7 @@ mod imp {
     pub fn attach(_game: isize, _parent: isize) {}
     pub fn resize_all(_parent: isize) {}
     pub fn focus() {}
+    pub fn detach_all() {}
 }
 
 pub use imp::*;
