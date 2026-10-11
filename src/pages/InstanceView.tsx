@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { save } from "@tauri-apps/plugin-dialog";
 import { api, ContentFolder, errorText, Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
@@ -62,6 +63,30 @@ export default function InstanceView(props: Props) {
     }
   }
 
+  async function exportPack() {
+    try {
+      const path = await save({
+        defaultPath: `${instance!.name}.mrpack`,
+        filters: [{ name: "Модпак Modrinth", extensions: ["mrpack"] }],
+      });
+      if (!path) return;
+      notify("Экспортирую сборку…");
+      await api.exportInstance(instance!.id, path);
+      notify("Сборка сохранена — её можно отправить другу");
+      revealItemInDir(path).catch(() => {});
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
+
+  async function toggleMod(projectId: string, enabled: boolean) {
+    try {
+      onChanged(await api.setModEnabled(instance!.id, projectId, enabled));
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
+
   async function openFolder() {
     try {
       await openPath(await api.instanceFolder(instance!.id));
@@ -91,6 +116,9 @@ export default function InstanceView(props: Props) {
             {instance.modpack ? ` · модпак «${instance.modpack.title}»` : ""}
           </p>
         </div>
+        <button className="btn icon" title="Экспорт в .mrpack (поделиться сборкой)" onClick={exportPack}>
+          <Icon name="share" />
+        </button>
         <button className="btn icon" title="Открыть папку" onClick={openFolder}>
           <Icon name="folder" />
         </button>
@@ -131,7 +159,24 @@ export default function InstanceView(props: Props) {
       )}
       {state === "stopped" && status?.error && (
         <div className="error-box crash-box">
-          <span className="grow">{status.error}</span>
+          <div className="grow">
+            <div>{status.error}</div>
+            {status.hints && status.hints.length > 0 && (
+              <>
+                <strong className="small">Вероятная причина:</strong>
+                <ul className="hints">
+                  {status.hints.map((h) => (
+                    <li key={h}>{h}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {instance.pending.length > 0 && (
+              <div className="small">
+                Не скачаны моды: {instance.pending.map((p) => p.title).join(", ")} — это частая причина вылетов.
+              </div>
+            )}
+          </div>
           {status.crashReport && (
             <button
               className="btn"
@@ -178,7 +223,15 @@ export default function InstanceView(props: Props) {
               </div>
             )}
             <div className="row between">
-              <span className="muted">{instance.mods.length ? "Установленные моды" : "Модов пока нет"}</span>
+              <span className="muted">
+                {instance.mods.length
+                  ? `Установленные моды${
+                      instance.mods.some((m) => m.disabled)
+                        ? ` (выключено: ${instance.mods.filter((m) => m.disabled).length})`
+                        : ""
+                    }`
+                  : "Модов пока нет"}
+              </span>
               <div className="row gap-sm">
                 {instance.mods.length > 0 && (
                   <button className="btn" disabled={state !== "stopped"} onClick={() => setShowUpdates(true)}>
@@ -194,6 +247,7 @@ export default function InstanceView(props: Props) {
               items={instance.mods}
               disabled={state !== "stopped"}
               onRemove={(id) => removeContent("mods", id)}
+              onToggle={toggleMod}
             />
           </>
         ))}

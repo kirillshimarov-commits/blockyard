@@ -45,7 +45,7 @@ pub async fn check(instance_id: &str) -> Result<Vec<ModUpdate>> {
     let mut by_hash: HashMap<String, usize> = HashMap::new();
     for (i, m) in inst.mods.iter().enumerate() {
         if m.source == Source::Modrinth && !m.version_id.is_empty() {
-            if let Some(h) = file_sha1(&inst.mods_dir().join(&m.file_name)) {
+            if let Some(h) = file_sha1(&inst.mods_dir().join(m.disk_name())) {
                 by_hash.insert(h, i);
             }
         }
@@ -133,12 +133,18 @@ pub async fn apply(instance_id: &str, project_ids: &[String]) -> Result<Instance
         mods::check_file_name(&u.new_file)?;
         http::download(&Download { url: u.url.clone(), path: inst.mods_dir().join(&u.new_file), sha1: u.sha1.clone() })
             .await?;
-        if u.current_file != u.new_file {
-            let _ = std::fs::remove_file(inst.mods_dir().join(&u.current_file));
-        }
+        let dir = inst.mods_dir();
         if let Some(m) = inst.mods.iter_mut().find(|m| m.project_id == u.project_id && m.source == u.source) {
-            m.file_name = u.new_file;
+            let old = dir.join(m.disk_name());
+            m.file_name = u.new_file.clone();
             m.version_id = u.new_version_id;
+            if u.current_file != u.new_file {
+                let _ = std::fs::remove_file(old);
+            }
+            // A disabled mod stays disabled after updating.
+            if m.disabled {
+                std::fs::rename(dir.join(&m.file_name), dir.join(m.disk_name()))?;
+            }
         }
         inst.save()?;
     }

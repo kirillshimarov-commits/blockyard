@@ -280,6 +280,7 @@ async fn install_mrpack(inst: &mut Instance, archive: &Path, reporter: &Reporter
             title: project.map(|p| p.title.clone()).unwrap_or_else(|| file_name.trim_end_matches(".jar").to_string()),
             file_name,
             icon_url: project.and_then(|p| p.icon_url.clone()),
+            disabled: false,
         };
         let folder = path.split('/').next().unwrap_or_default();
         if let Some(list) = inst.list_mut(folder) {
@@ -391,6 +392,7 @@ async fn install_curseforge(inst: &mut Instance, archive: &Path, reporter: &Repo
             title: info.name.clone(),
             file_name: file.file_name.clone(),
             icon_url: info.icon(),
+            disabled: false,
         };
         match &file.download_url {
             Some(url) => {
@@ -433,5 +435,174 @@ mod tests {
         assert!(safe_relative("/etc/passwd").is_none());
         assert!(safe_relative("mods/../../x").is_none());
         assert!(safe_relative("").is_none());
+    }
+}
+
+// ---------- Import from a file ----------
+
+#[derive(Debug, Clone, Copy)]
+pub enum ArchiveKind {
+    Mrpack,
+    Curseforge,
+}
+
+/// Reads the pack's name and format and creates a placeholder instance for it.
+pub fn prepare_import(path: &Path, memory_mb: u32) -> Result<(Instance, ArchiveKind)> {
+    let (kind, name) = if let Ok(index) = read_json(path, "modrinth.index.json") {
+        (ArchiveKind::Mrpack, index["name"].as_str().unwrap_or("Импортированная сборка").to_string())
+    } else if let Ok(manifest) = read_json(path, "manifest.json") {
+        (ArchiveKind::Curseforge, manifest["name"].as_str().unwrap_or("Импортированная сборка").to_string())
+    } else {
+        bail!("Это не модпак: в архиве нет modrinth.index.json или manifest.json");
+    };
+    let inst = instance::create(&name, "", Loader::Vanilla, memory_mb)?;
+    Ok((inst, kind))
+}
+
+pub async fn finish_import(instance_id: &str, path: &Path, kind: ArchiveKind, reporter: &Reporter) -> Result<Instance> {
+    let mut inst = instance::get(instance_id)?;
+    match kind {
+        ArchiveKind::Mrpack => install_mrpack(&mut inst, path, reporter).await?,
+        ArchiveKind::Curseforge => install_curseforge(&mut inst, path, reporter).await?,
+    }
+    inst.save()?;
+    Ok(inst)
+}
+
+// ---------- Export to .mrpack ----------
+
+/// Folders with settings worth sharing along with the mods.
+const EXPORTED_CONFIG_DIRS: &[&str] = &["config", "defaultconfigs", "kubejs", "scripts"];
+
+#[derive(Deserialize)]
+struct MrVersionFull {
+    files: Vec<MrVersionFile>,
+}
+
+#[derive(Deserialize)]
+struct MrVersionFile {
+    url: String,
+    hashes: HashMap<String, String>,
+}
+
+/// Writes the instance as a Modrinth modpack. Files known to Modrinth are referenced by URL;
+/// everything else (CurseForge mods, configs) is packed into overrides/.
+pub async fn export_mrpack(instance_id: &str, dest: &Path) -> Result<()> {
+    use sha1::{Digest, Sha1};
+    use sha2::Sha512;
+
+    let inst = instance::get(instance_id)?;
+    let game_dir = inst.game_dir();
+
+    let mut dependencies = serde_json::Map::new();
+    dependencies.insert("minecraft".into(), json!(inst.game_version));
+    match &inst.loader {
+        Loader::Vanilla => {}
+        Loader::Fabric { version } => drop(dependencies.insert("fabric-loader".into(), json!(version))),
+        Loader::Quilt { version } => drop(dependencies.insert("quilt-loader".into(), json!(version))),
+        Loader::NeoForge { version } => drop(dependencies.insert("neoforge".into(), json!(version))),
+        Loader::Forge { version } => {
+            let short = version.strip_prefix(&format!("{}-", inst.game_version)).unwrap_or(version);
+            dependencies.insert("forge".into(), json!(short));
+        }
+    }
+
+    // Every enabled mod, shader and resource pack with its hashes.
+    struct Entry {
+        rel: String,
+        sha1: String,
+        sha512: String,
+        size: u64,
+    }
+    let mut entries = Vec::new();
+    let lists = [("mods", &inst.mods), ("shaderpacks", &inst.shaders), ("resourcepacks", &inst.resourcepacks)];
+    for (folder, list) in lists {
+        for m in list.iter().filter(|m| !m.disabled) {
+            let Ok(bytes) = std::fs::read(game_dir.join(folder).join(&m.file_name)) else { continue };
+            entries.push(Entry {
+                rel: format!("{folder}/{}", m.file_name),
+                sha1: hex::encode(Sha1::digest(&bytes)),
+                sha512: hex::encode(Sha512::digest(&bytes)),
+                size: bytes.len() as u64,
+            });
+        }
+    }
+
+    // Ask Modrinth which of these files it hosts.
+    let hashes: Vec<&String> = entries.iter().map(|e| &e.sha1).collect();
+    let known: HashMap<String, MrVersionFull> = if hashes.is_empty() {
+        HashMap::new()
+    } else {
+        http::client()
+            .post("https://api.modrinth.com/v2/version_files")
+            .json(&json!({ "hashes": hashes, "algorithm": "sha1" }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?
+    };
+
+    let mut files = Vec::new();
+    let mut overrides: Vec<(String, PathBuf)> = Vec::new();
+    for e in &entries {
+        let url = known.get(&e.sha1).and_then(|v| {
+            v.files.iter().find(|f| f.hashes.get("sha1") == Some(&e.sha1)).map(|f| f.url.clone())
+        });
+        match url {
+            Some(url) => files.push(json!({
+                "path": e.rel,
+                "hashes": { "sha1": e.sha1, "sha512": e.sha512 },
+                "env": { "client": "required", "server": "required" },
+                "downloads": [url],
+                "fileSize": e.size,
+            })),
+            None => overrides.push((format!("overrides/{}", e.rel), game_dir.join(&e.rel))),
+        }
+    }
+    for dir in EXPORTED_CONFIG_DIRS {
+        collect_files(&game_dir.join(dir), &format!("overrides/{dir}"), &mut overrides);
+    }
+
+    let index = json!({
+        "formatVersion": 1,
+        "game": "minecraft",
+        "versionId": "1.0.0",
+        "name": inst.name,
+        "summary": "Сборка из Blockyard",
+        "files": files,
+        "dependencies": dependencies,
+    });
+
+    let dest = dest.to_path_buf();
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        use std::io::Write;
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&dest)?);
+        let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file("modrinth.index.json", options)?;
+        zip.write_all(serde_json::to_string_pretty(&index)?.as_bytes())?;
+        for (name, path) in overrides {
+            let Ok(bytes) = std::fs::read(&path) else { continue };
+            zip.start_file(name.replace('\\', "/"), options)?;
+            zip.write_all(&bytes)?;
+        }
+        zip.finish()?;
+        Ok(())
+    })
+    .await??;
+    Ok(())
+}
+
+/// Recursively lists files under `dir` as (archive path, disk path).
+fn collect_files(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = format!("{prefix}/{}", entry.file_name().to_string_lossy());
+        if path.is_dir() {
+            collect_files(&path, &name, out);
+        } else {
+            out.push((name, path));
+        }
     }
 }

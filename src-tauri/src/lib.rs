@@ -4,6 +4,7 @@ use crate::launcher::instance::{self, Instance, Loader};
 use crate::launcher::settings::{self, Settings};
 use crate::launcher::appearance;
 use crate::launcher::auth;
+use crate::launcher::updater;
 use crate::launcher::updates;
 use crate::launcher::crash;
 use crate::launcher::mods::{self, Asset, ContentKind, Source};
@@ -50,29 +51,30 @@ struct StateEvent {
     error: Option<String>,
     /// Crash report written by the game, if it crashed.
     crash_report: Option<String>,
+    /// Plain-language guesses at the cause of a crash.
+    hints: Vec<String>,
 }
 
 fn emit_state(app: &AppHandle, instance_id: &str, state: &'static str, error: Option<String>) {
     let _ = app.emit(
         "game-state",
-        StateEvent { instance_id: instance_id.to_string(), state, error, crash_report: None },
+        StateEvent { instance_id: instance_id.to_string(), state, error, crash_report: None, hints: Vec::new() },
     );
 }
 
 fn emit_stopped(app: &AppHandle, instance_id: &str, result: anyhow::Result<()>) {
-    let (error, crash_report) = match result {
-        Ok(()) => (None, None),
+    let (error, crash_report, hints) = match result {
+        Ok(()) => (None, None, Vec::new()),
         Err(e) => {
-            let report = e
-                .downcast_ref::<crash::GameCrash>()
-                .and_then(|c| c.report.as_ref())
-                .map(|p| p.to_string_lossy().into_owned());
-            (Some(err(e)), report)
+            let crash = e.downcast_ref::<crash::GameCrash>();
+            let report = crash.and_then(|c| c.report.as_ref()).map(|p| p.to_string_lossy().into_owned());
+            let hints = crash.map(|c| c.hints.clone()).unwrap_or_default();
+            (Some(err(e)), report, hints)
         }
     };
     let _ = app.emit(
         "game-state",
-        StateEvent { instance_id: instance_id.to_string(), state: "stopped", error, crash_report },
+        StateEvent { instance_id: instance_id.to_string(), state: "stopped", error, crash_report, hints },
     );
 }
 
@@ -201,6 +203,8 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session,
     launch::mark_played(inst)?;
     emit_state(app, &inst.id, "running", None);
 
+    // The last lines of output, for crash analysis when there is no crash report.
+    let log_tail: Arc<Mutex<std::collections::VecDeque<String>>> = Arc::default();
     for stream in [child.stdout.take().map(|s| Box::new(s) as Box<dyn tokio::io::AsyncRead + Unpin + Send>),
                    child.stderr.take().map(|s| Box::new(s) as Box<dyn tokio::io::AsyncRead + Unpin + Send>)]
         .into_iter()
@@ -208,9 +212,17 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session,
     {
         let app = app.clone();
         let instance_id = inst.id.clone();
+        let tail = log_tail.clone();
         tauri::async_runtime::spawn(async move {
             let mut lines = BufReader::new(stream).lines();
             while let Ok(Some(line)) = lines.next_line().await {
+                {
+                    let mut t = tail.lock().unwrap();
+                    t.push_back(line.clone());
+                    if t.len() > 400 {
+                        t.pop_front();
+                    }
+                }
                 let _ = app.emit("game-log", LogEvent { instance_id: instance_id.clone(), line });
             }
         });
@@ -220,7 +232,10 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session,
         status = child.wait() => {
             let status = status?;
             if !status.success() {
-                return Err(crash::describe(&prepared.game_dir, started, status.code().unwrap_or(-1)).into());
+                // Give the log readers a moment to drain the last lines.
+                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                let tail = log_tail.lock().unwrap().iter().cloned().collect::<Vec<_>>().join("\n");
+                return Err(crash::describe(&prepared.game_dir, started, status.code().unwrap_or(-1), &tail).into());
             }
         }
         _ = stop.notified() => {
@@ -339,8 +354,35 @@ fn remove_account(uuid: String) -> CmdResult<Settings> {
     Ok(s)
 }
 
-/// Creates an instance for the modpack right away and installs it in the background,
-/// reporting progress like a game launch.
+/// Runs an install job for an instance in the background, reporting progress like a launch.
+fn spawn_install<F, Fut>(app: &AppHandle, running: &Running, instance_id: &str, job: F)
+where
+    F: FnOnce(Reporter) -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = anyhow::Result<()>> + Send,
+{
+    let stop = Arc::new(Notify::new());
+    running.0.lock().unwrap().insert(instance_id.to_string(), stop.clone());
+    emit_state(app, instance_id, "installing", None);
+
+    let app = app.clone();
+    let id = instance_id.to_string();
+    tauri::async_runtime::spawn(async move {
+        let app_for_progress = app.clone();
+        let id_for_progress = id.clone();
+        let reporter: Reporter = Arc::new(move |progress| {
+            let _ = app_for_progress
+                .emit("launch-progress", ProgressEvent { instance_id: id_for_progress.clone(), progress });
+        });
+        let result = tokio::select! {
+            r = job(reporter) => r,
+            _ = stop.notified() => Err(anyhow::anyhow!("Установка отменена")),
+        };
+        app.state::<Running>().0.lock().unwrap().remove(&id);
+        emit_state(&app, &id, "stopped", result.err().map(err));
+    });
+}
+
+/// Creates an instance for the modpack right away and installs it in the background.
 #[tauri::command]
 async fn install_modpack(
     app: AppHandle,
@@ -349,27 +391,52 @@ async fn install_modpack(
     running: State<'_, Running>,
 ) -> CmdResult<Instance> {
     let (inst, plan) = modpack::prepare(source, &project_id, settings::load().memory_mb).await.map_err(err)?;
-    let stop = Arc::new(Notify::new());
-    running.0.lock().unwrap().insert(inst.id.clone(), stop.clone());
-    emit_state(&app, &inst.id, "installing", None);
-
-    let app2 = app.clone();
     let id = inst.id.clone();
-    tauri::async_runtime::spawn(async move {
-        let app_for_progress = app2.clone();
-        let id_for_progress = id.clone();
-        let reporter: Reporter = Arc::new(move |progress| {
-            let _ = app_for_progress
-                .emit("launch-progress", ProgressEvent { instance_id: id_for_progress.clone(), progress });
-        });
-        let result = tokio::select! {
-            r = modpack::finish(&id, plan, &reporter) => r.map(|_| ()),
-            _ = stop.notified() => Err(anyhow::anyhow!("Установка модпака отменена")),
-        };
-        app2.state::<Running>().0.lock().unwrap().remove(&id);
-        emit_state(&app2, &id, "stopped", result.err().map(err));
+    spawn_install(&app, &running, &inst.id, move |reporter| async move {
+        modpack::finish(&id, plan, &reporter).await.map(|_| ())
     });
     Ok(inst)
+}
+
+/// Imports a .mrpack or CurseForge modpack zip from disk into a new instance.
+#[tauri::command]
+async fn import_modpack(app: AppHandle, path: String, running: State<'_, Running>) -> CmdResult<Instance> {
+    let path = std::path::PathBuf::from(path);
+    let (inst, kind) = modpack::prepare_import(&path, settings::load().memory_mb).map_err(err)?;
+    let id = inst.id.clone();
+    spawn_install(&app, &running, &inst.id, move |reporter| async move {
+        modpack::finish_import(&id, &path, kind, &reporter).await.map(|_| ())
+    });
+    Ok(inst)
+}
+
+#[tauri::command]
+async fn export_instance(instance_id: String, path: String) -> CmdResult<()> {
+    modpack::export_mrpack(&instance_id, std::path::Path::new(&path)).await.map_err(err)
+}
+
+#[tauri::command]
+fn set_mod_enabled(instance_id: String, project_id: String, enabled: bool) -> CmdResult<Instance> {
+    instance::set_mod_enabled(&instance_id, &project_id, enabled).map_err(err)
+}
+
+// ---------- Launcher updates ----------
+
+#[tauri::command]
+fn launcher_version() -> &'static str {
+    updater::current_version()
+}
+
+#[tauri::command]
+async fn check_launcher_update() -> CmdResult<Option<updater::LauncherUpdate>> {
+    updater::check().await.map_err(err)
+}
+
+#[tauri::command]
+async fn install_launcher_update(app: AppHandle, url: String) -> CmdResult<()> {
+    updater::install(&url).await.map_err(err)?;
+    app.exit(0);
+    Ok(())
 }
 
 /// Picks up mods the user downloaded manually from the Downloads folder.
@@ -431,6 +498,7 @@ fn set_window_style(window: WebviewWindow, effect: String, theme: String) -> &'s
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Running::default())
         .setup(|app| {
             // The window starts hidden so the saved effect is in place before it appears.
@@ -473,6 +541,12 @@ pub fn run() {
             finish_microsoft_login,
             remove_account,
             install_modpack,
+            import_modpack,
+            export_instance,
+            set_mod_enabled,
+            launcher_version,
+            check_launcher_update,
+            install_launcher_update,
             get_appearance,
             save_appearance,
             set_window_style,

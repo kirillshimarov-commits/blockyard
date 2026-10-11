@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Instance, loaderLabel } from "../api";
+import { open } from "@tauri-apps/plugin-dialog";
+import { api, errorText, Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
 import CreateInstanceModal from "../components/CreateInstanceModal";
 import { Icon } from "../components/Icon";
@@ -17,6 +18,21 @@ interface Props {
 export default function Library({ instances, status, onOpen, onPlay, onCreated, notify }: Props) {
   const [creating, setCreating] = useState(false);
 
+  async function importPack() {
+    try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: "Модпак (.mrpack, CurseForge .zip)", extensions: ["mrpack", "zip"] }],
+      });
+      if (typeof path !== "string") return;
+      const inst = await api.importModpack(path);
+      notify(`Импортирую «${inst.name}»…`);
+      onCreated(inst);
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
+
   return (
     <div className="page">
       <header className="page-header">
@@ -24,9 +40,14 @@ export default function Library({ instances, status, onOpen, onPlay, onCreated, 
           <h1>Библиотека</h1>
           <p className="muted">Ваши сборки Minecraft</p>
         </div>
-        <button className="btn primary" onClick={() => setCreating(true)}>
-          <Icon name="plus" /> Новая сборка
-        </button>
+        <div className="row gap-sm">
+          <button className="btn" title="Открыть .mrpack или модпак CurseForge из файла" onClick={importPack}>
+            <Icon name="upload" /> Импорт
+          </button>
+          <button className="btn primary" onClick={() => setCreating(true)}>
+            <Icon name="plus" /> Новая сборка
+          </button>
+        </div>
       </header>
 
       {instances.length === 0 ? (

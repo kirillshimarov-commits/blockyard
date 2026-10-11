@@ -1024,3 +1024,78 @@ input[type="range"]::-webkit-slider-thumb {
 .center-text {
   text-align: center;
 }
+
+/* ---------- Mod on/off switch ---------- */
+
+.switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  background: rgb(var(--line) / 0.18);
+  transition: background 0.15s;
+  pointer-events: none;
+}
+.switch span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.switch input:checked + span {
+  background: var(--accent);
+}
+.switch input:checked + span::after {
+  transform: translateX(16px);
+}
+.switch input:disabled + span {
+  opacity: 0.5;
+}
+.mod-row.is-disabled > img,
+.mod-row.is-disabled > .mod-icon-fallback,
+.mod-row.is-disabled .grow {
+  opacity: 0.45;
+}
+.hints {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+.hints li {
+  margin-top: 4px;
+}
+.update-banner {
+  margin-top: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  font-size: 13px;
+}
+.update-banner .btn {
+  width: 100%;
+  margin-top: 8px;
+}
+.update-banner + .account {
+  margin-top: 8px;
+}
+:root[data-compact="true"] .update-banner span {
+  display: none;
+}

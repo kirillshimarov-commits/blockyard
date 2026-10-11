@@ -8,6 +8,8 @@
   "permissions": [
     "core:default",
     "opener:default",
+    "dialog:allow-save",
+    "dialog:allow-open",
     {
       "identifier": "opener:allow-open-path",
       "allow": [
@@ -33,6 +35,17 @@
         },
         {
           "url": "https://microsoft.com/*"
+        },
+        {
+          "url": "https://github.com/*"
+        }
+      ]
+    },
+    {
+      "identifier": "opener:allow-reveal-item-in-dir",
+      "allow": [
+        {
+          "path": "**"
         }
       ]
     }

@@ -15,6 +15,7 @@ export interface InstalledMod {
   title: string;
   fileName: string;
   iconUrl?: string | null;
+  disabled?: boolean;
 }
 
 export interface Instance {
@@ -120,6 +121,13 @@ export interface StateEvent {
   state: GameState;
   error?: string | null;
   crashReport?: string | null;
+  hints?: string[];
+}
+
+export interface LauncherUpdate {
+  version: string;
+  notes: string;
+  url: string;
 }
 
 export interface LogEvent {
@@ -168,6 +176,13 @@ export const api = {
   finishMicrosoftLogin: (code: DeviceCode) => invoke<Account>("finish_microsoft_login", { code }),
   removeAccount: (uuid: string) => invoke<Settings>("remove_account", { uuid }),
   installModpack: (source: Source, projectId: string) => invoke<Instance>("install_modpack", { source, projectId }),
+  importModpack: (path: string) => invoke<Instance>("import_modpack", { path }),
+  exportInstance: (instanceId: string, path: string) => invoke<void>("export_instance", { instanceId, path }),
+  setModEnabled: (instanceId: string, projectId: string, enabled: boolean) =>
+    invoke<Instance>("set_mod_enabled", { instanceId, projectId, enabled }),
+  launcherVersion: () => invoke<string>("launcher_version"),
+  checkLauncherUpdate: () => invoke<LauncherUpdate | null>("check_launcher_update"),
+  installLauncherUpdate: (url: string) => invoke<void>("install_launcher_update", { url }),
   importPendingMods: (instanceId: string) => invoke<Instance>("import_pending_mods", { instanceId }),
 };
 

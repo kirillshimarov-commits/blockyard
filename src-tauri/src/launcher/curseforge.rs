@@ -302,6 +302,7 @@ pub async fn install(instance_id: &str, project_id: &str) -> Result<InstallResul
                     title: info.name.clone(),
                     file_name: file.file_name.clone(),
                     icon_url: info.icon(),
+                    disabled: false,
                 });
             }
             None => {
@@ -381,6 +382,7 @@ pub async fn install_asset(instance_id: &str, project_id: &str, asset: Asset) ->
                 title: info.name.clone(),
                 file_name: file.file_name.clone(),
                 icon_url: info.icon(),
+                disabled: false,
             };
             if let Some(list) = inst.list_mut(folder) {
                 list.push(entry);

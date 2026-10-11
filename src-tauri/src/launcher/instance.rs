@@ -59,6 +59,20 @@ pub struct InstalledMod {
     pub file_name: String,
     #[serde(default)]
     pub icon_url: Option<String>,
+    /// Disabled mods stay on disk as "<file>.disabled" so the loader skips them.
+    #[serde(default)]
+    pub disabled: bool,
+}
+
+impl InstalledMod {
+    /// File name as it is on disk right now.
+    pub fn disk_name(&self) -> String {
+        if self.disabled {
+            format!("{}.disabled", self.file_name)
+        } else {
+            self.file_name.clone()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -188,10 +202,32 @@ pub fn remove_content(id: &str, folder: &str, project_id: &str) -> Result<Instan
     if let Some(list) = instance.list_mut(folder) {
         if let Some(pos) = list.iter().position(|m| m.project_id == project_id) {
             let removed = list.remove(pos);
-            let _ = std::fs::remove_file(dir.join(&removed.file_name));
+            let _ = std::fs::remove_file(dir.join(removed.disk_name()));
         }
     }
     instance.pending.retain(|p| p.project_id != project_id);
+    instance.save()?;
+    Ok(instance)
+}
+
+/// Turns a mod on or off by renaming its file to/from "<file>.disabled".
+pub fn set_mod_enabled(id: &str, project_id: &str, enabled: bool) -> Result<Instance> {
+    let mut instance = get(id)?;
+    let dir = instance.mods_dir();
+    let m = instance
+        .mods
+        .iter_mut()
+        .find(|m| m.project_id == project_id)
+        .ok_or_else(|| anyhow!("мод не найден"))?;
+    if m.disabled == !enabled {
+        return Ok(instance);
+    }
+    let from = dir.join(m.disk_name());
+    m.disabled = !enabled;
+    let to = dir.join(m.disk_name());
+    if from.is_file() {
+        std::fs::rename(&from, &to)?;
+    }
     instance.save()?;
     Ok(instance)
 }

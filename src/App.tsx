@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Account, api, ContentKind, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
+import { Account, api, ContentKind, LauncherUpdate, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
 import Library from "./pages/Library";
 import InstanceView from "./pages/InstanceView";
 import Browse from "./pages/Browse";
@@ -26,6 +26,7 @@ export interface GameStatus {
   progress?: ProgressEvent;
   error?: string;
   crashReport?: string;
+  hints?: string[];
 }
 
 const MAX_LOG_LINES = 3000;
@@ -39,6 +40,24 @@ export default function App() {
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null);
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [launcherUpdate, setLauncherUpdate] = useState<LauncherUpdate | null>(null);
+  const [updating, setUpdating] = useState(false);
+
+  // Look for a new launcher version once at startup; failures (offline, private repo) are ignored.
+  useEffect(() => {
+    api.checkLauncherUpdate().then(setLauncherUpdate).catch(() => {});
+  }, []);
+
+  async function installUpdate() {
+    if (!launcherUpdate) return;
+    setUpdating(true);
+    try {
+      await api.installLauncherUpdate(launcherUpdate.url);
+    } catch (e) {
+      setUpdating(false);
+      notify(errorText(e), true);
+    }
+  }
   const activeAccount = accounts.find((a) => a.uuid === settings?.activeAccount);
 
   // Refresh the account list whenever the active account changes (login, logout, switch).
@@ -109,6 +128,7 @@ export default function App() {
             state: payload.state,
             error: payload.error ?? undefined,
             crashReport: payload.crashReport ?? undefined,
+            hints: payload.hints ?? [],
           },
         }));
         if (payload.state === "installing") setLogs((l) => ({ ...l, [payload.instanceId]: [] }));
@@ -184,6 +204,17 @@ export default function App() {
                 <span className="truncate">{inst.name}</span>
               </button>
             ))}
+          </div>
+        )}
+        {launcherUpdate && (
+          <div className="update-banner" title={`Доступна версия ${launcherUpdate.version}`}>
+            <span>
+              Доступна версия <strong>{launcherUpdate.version}</strong>
+            </span>
+            <button className="btn primary" disabled={updating} onClick={installUpdate}>
+              {updating ? <span className="spinner" /> : <Icon name="download" />}
+              <span>{updating ? "Скачиваю…" : "Обновить"}</span>
+            </button>
           </div>
         )}
         <div className="account">

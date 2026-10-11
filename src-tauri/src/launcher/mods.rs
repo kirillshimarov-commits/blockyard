@@ -161,6 +161,7 @@ pub fn import_pending(instance_id: &str) -> Result<Instance> {
             title: p.title,
             file_name: p.file_name,
             icon_url: p.icon_url,
+            disabled: false,
         };
         if let Some(list) = inst.list_mut(folder) {
             list.push(entry);
