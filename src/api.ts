@@ -148,6 +148,24 @@ export interface StateEvent {
   hints?: string[];
 }
 
+export interface LinkInfo {
+  id: string;
+  rttMs?: number | null;
+  relayed: boolean;
+}
+
+export interface InviteInfo {
+  world: string;
+  gameVersion: string;
+  loader: Loader;
+}
+
+export interface TunnelStatus {
+  lanPorts: Record<string, number>;
+  host?: { instanceId: string; invite: string; peers: LinkInfo[] } | null;
+  guest?: { info: InviteInfo; connected: boolean; link: LinkInfo } | null;
+}
+
 export interface LauncherUpdate {
   version: string;
   notes: string;
@@ -211,6 +229,12 @@ export const api = {
   launcherVersion: () => invoke<string>("launcher_version"),
   checkLauncherUpdate: () => invoke<LauncherUpdate | null>("check_launcher_update"),
   installLauncherUpdate: (url: string) => invoke<void>("install_launcher_update", { url }),
+  tunnelStatus: () => invoke<TunnelStatus>("tunnel_status"),
+  tunnelInvite: (instanceId: string) => invoke<string>("tunnel_invite", { instanceId }),
+  tunnelStopHost: () => invoke<void>("tunnel_stop_host"),
+  tunnelDecode: (code: string) => invoke<InviteInfo>("tunnel_decode", { code }),
+  tunnelJoin: (code: string, instanceId: string) => invoke<void>("tunnel_join", { code, instanceId }),
+  tunnelLeave: () => invoke<void>("tunnel_leave"),
   importPendingMods: (instanceId: string) => invoke<Instance>("import_pending_mods", { instanceId }),
 };
 

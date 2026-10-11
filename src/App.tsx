@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Account, api, ContentKind, LauncherUpdate, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
+import { Account, api, ContentKind, LauncherUpdate, TunnelStatus, errorText, GameState, Instance, LogEvent, ProgressEvent, Settings, StateEvent } from "./api";
 import Library from "./pages/Library";
 import InstanceView from "./pages/InstanceView";
 import Browse from "./pages/Browse";
 import SettingsPage from "./pages/Settings";
 import { Icon, IconName } from "./components/Icon";
+import JoinFriendModal from "./components/JoinFriendModal";
+import { linkLabel } from "./components/FriendPanel";
 import {
   Appearance,
   applyAppearance,
@@ -41,6 +43,23 @@ export default function App() {
   const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [launcherUpdate, setLauncherUpdate] = useState<LauncherUpdate | null>(null);
+  const [tunnel, setTunnel] = useState<TunnelStatus>({ lanPorts: {} });
+  const [joining, setJoining] = useState(false);
+
+  const refreshTunnel = useCallback(() => {
+    api.tunnelStatus().then(setTunnel).catch(() => {});
+  }, []);
+
+  // Keep ping and connected friends fresh while a tunnel is active.
+  useEffect(() => {
+    refreshTunnel();
+    const unlisten = listen("lan-opened", refreshTunnel);
+    const timer = window.setInterval(refreshTunnel, 3000);
+    return () => {
+      window.clearInterval(timer);
+      unlisten.then((f) => f());
+    };
+  }, [refreshTunnel]);
   const [updating, setUpdating] = useState(false);
 
   // Look for a new launcher version once at startup; failures (offline, private repo) are ignored.
@@ -206,6 +225,26 @@ export default function App() {
             ))}
           </div>
         )}
+        {tunnel.guest && (
+          <div className={`guest-banner ${tunnel.guest.connected ? "" : "lost"}`}>
+            <span>
+              {tunnel.guest.connected ? "В мире друга" : "Связь с другом потеряна"}
+              <br />
+              <small className="muted">{linkLabel(tunnel.guest.link)}</small>
+            </span>
+            <button
+              className="btn small-btn"
+              onClick={() =>
+                api
+                  .tunnelLeave()
+                  .then(refreshTunnel)
+                  .catch(() => {})
+              }
+            >
+              Отключиться
+            </button>
+          </div>
+        )}
         {launcherUpdate && (
           <div className="update-banner" title={`Доступна версия ${launcherUpdate.version}`}>
             <span>
@@ -237,6 +276,7 @@ export default function App() {
             status={status}
             onOpen={(id) => setView({ kind: "instance", id })}
             onPlay={play}
+            onJoinFriend={() => setJoining(true)}
             onCreated={(inst) => {
               setInstances((list) => [inst, ...list]);
               setView({ kind: "instance", id: inst.id });
@@ -249,6 +289,8 @@ export default function App() {
             key={view.id}
             instance={instances.find((i) => i.id === view.id)}
             instances={instances}
+            tunnel={tunnel}
+            onTunnelChanged={refreshTunnel}
             status={status[view.id]}
             logs={logs[view.id] ?? []}
             onPlay={() => play(view.id)}
@@ -292,6 +334,19 @@ export default function App() {
           />
         )}
       </main>
+
+      {joining && (
+        <JoinFriendModal
+          instances={instances}
+          onClose={() => setJoining(false)}
+          onCreated={(inst) => setInstances((list) => [inst, ...list])}
+          onJoined={(id) => {
+            setJoining(false);
+            refreshTunnel();
+            setView({ kind: "instance", id });
+          }}
+        />
+      )}
 
       {toast && <div className={`toast ${toast.error ? "error" : ""}`}>{toast.text}</div>}
     </div>

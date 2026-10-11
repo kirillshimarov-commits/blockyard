@@ -14,6 +14,7 @@ pub mod modrinth;
 pub mod modpack;
 pub mod mods;
 pub mod mojang;
+pub mod tunnel;
 pub mod updater;
 pub mod updates;
 pub mod paths;

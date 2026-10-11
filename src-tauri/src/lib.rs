@@ -4,6 +4,7 @@ use crate::launcher::instance::{self, Instance, Loader};
 use crate::launcher::settings::{self, Settings};
 use crate::launcher::appearance;
 use crate::launcher::auth;
+use crate::launcher::tunnel;
 use crate::launcher::updater;
 use crate::launcher::updates;
 use crate::launcher::crash;
@@ -23,6 +24,14 @@ fn err(e: anyhow::Error) -> String {
     format!("{e:#}")
 }
 
+/// Play-with-a-friend state: LAN ports of open worlds and the active host/guest tunnels.
+#[derive(Default)]
+struct Tunnels {
+    lan_ports: Mutex<HashMap<String, u16>>,
+    host: tokio::sync::Mutex<Option<tunnel::Host>>,
+    guest: tokio::sync::Mutex<Option<tunnel::Guest>>,
+}
+
 /// Instances that are installing or running, with a handle to stop them.
 #[derive(Default)]
 struct Running(Mutex<HashMap<String, Arc<Notify>>>);
@@ -33,6 +42,13 @@ struct ProgressEvent {
     instance_id: String,
     #[serde(flatten)]
     progress: Progress,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LanEvent {
+    instance_id: String,
+    port: u16,
 }
 
 #[derive(Clone, Serialize)]
@@ -162,6 +178,11 @@ fn running_instances(running: State<'_, Running>) -> Vec<String> {
 
 #[tauri::command]
 async fn launch_instance(app: AppHandle, id: String, running: State<'_, Running>) -> CmdResult<()> {
+    start_game(app, id, running.inner(), None).await
+}
+
+/// Starts the game; `join_port` makes it connect to a friend's world through the local tunnel port.
+async fn start_game(app: AppHandle, id: String, running: &Running, join_port: Option<u16>) -> CmdResult<()> {
     let mut inst = instance::get(&id).map_err(err)?;
     let settings = settings::load();
     let session = match &settings.active_account {
@@ -179,14 +200,30 @@ async fn launch_instance(app: AppHandle, id: String, running: State<'_, Running>
 
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
-        let result = run_game(&app2, &mut inst, &session, stop).await;
+        let result = run_game(&app2, &mut inst, &session, stop, join_port).await;
         app2.state::<Running>().0.lock().unwrap().remove(&inst.id);
+        // The world is gone with the game: forget its LAN port and stop inviting friends to it.
+        let tunnels = app2.state::<Tunnels>();
+        tunnels.lan_ports.lock().unwrap().remove(&inst.id);
+        let mut host = tunnels.host.lock().await;
+        if host.as_ref().is_some_and(|h| h.instance_id == inst.id) {
+            if let Some(h) = host.take() {
+                h.stop().await;
+            }
+        }
+        drop(host);
         emit_stopped(&app2, &inst.id, result);
     });
     Ok(())
 }
 
-async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session, stop: Arc<Notify>) -> anyhow::Result<()> {
+async fn run_game(
+    app: &AppHandle,
+    inst: &mut Instance,
+    session: &auth::Session,
+    stop: Arc<Notify>,
+    join_port: Option<u16>,
+) -> anyhow::Result<()> {
     emit_state(app, &inst.id, "installing", None);
     let app_for_progress = app.clone();
     let id_for_progress = inst.id.clone();
@@ -194,10 +231,13 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session,
         let _ = app_for_progress.emit("launch-progress", ProgressEvent { instance_id: id_for_progress.clone(), progress });
     });
 
-    let prepared = tokio::select! {
+    let mut prepared = tokio::select! {
         p = launch::prepare(inst, session, &reporter) => p?,
         _ = stop.notified() => return Ok(()),
     };
+    if let Some(port) = join_port {
+        prepared.args.extend(tunnel::join_args(&inst.game_version, port));
+    }
     let pre_launch = inst.settings.pre_launch.trim().to_string();
     if !pre_launch.is_empty() {
         report_stage(app, &inst.id, "Команда перед запуском");
@@ -223,6 +263,10 @@ async fn run_game(app: &AppHandle, inst: &mut Instance, session: &auth::Session,
         tauri::async_runtime::spawn(async move {
             let mut lines = BufReader::new(stream).lines();
             while let Ok(Some(line)) = lines.next_line().await {
+                if let Some(port) = tunnel::parse_lan_port(&line) {
+                    app.state::<Tunnels>().lan_ports.lock().unwrap().insert(instance_id.clone(), port);
+                    let _ = app.emit("lan-opened", LanEvent { instance_id: instance_id.clone(), port });
+                }
                 {
                     let mut t = tail.lock().unwrap();
                     t.push_back(line.clone());
@@ -482,6 +526,116 @@ fn set_mod_enabled(instance_id: String, project_id: String, enabled: bool) -> Cm
     instance::set_mod_enabled(&instance_id, &project_id, enabled).map_err(err)
 }
 
+// ---------- Play with a friend ----------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HostStatus {
+    instance_id: String,
+    invite: String,
+    peers: Vec<tunnel::LinkInfo>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GuestStatus {
+    info: tunnel::InviteInfo,
+    connected: bool,
+    link: tunnel::LinkInfo,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TunnelStatus {
+    lan_ports: HashMap<String, u16>,
+    host: Option<HostStatus>,
+    guest: Option<GuestStatus>,
+}
+
+#[tauri::command]
+async fn tunnel_status(tunnels: State<'_, Tunnels>) -> CmdResult<TunnelStatus> {
+    let lan_ports = tunnels.lan_ports.lock().unwrap().clone();
+    let host = tunnels.host.lock().await.as_ref().map(|h| HostStatus {
+        instance_id: h.instance_id.clone(),
+        invite: h.invite.clone(),
+        peers: h.peers(),
+    });
+    let guest = tunnels.guest.lock().await.as_ref().map(|g| GuestStatus {
+        info: g.info.clone(),
+        connected: g.is_connected(),
+        link: g.link(),
+    });
+    Ok(TunnelStatus { lan_ports, host, guest })
+}
+
+/// Starts inviting friends into the world this instance has opened to LAN; returns the invite code.
+#[tauri::command]
+async fn tunnel_invite(instance_id: String, tunnels: State<'_, Tunnels>) -> CmdResult<String> {
+    let port = tunnels
+        .lan_ports
+        .lock()
+        .unwrap()
+        .get(&instance_id)
+        .copied()
+        .ok_or("Сначала откройте мир для сети: в игре Esc → «Открыть для сети»")?;
+    let mut host = tunnels.host.lock().await;
+    if let Some(h) = host.as_ref().filter(|h| h.instance_id == instance_id) {
+        return Ok(h.invite.clone());
+    }
+    if let Some(old) = host.take() {
+        old.stop().await;
+    }
+    let inst = instance::get(&instance_id).map_err(err)?;
+    let h = tunnel::Host::start(&inst, &inst.name, port).await.map_err(err)?;
+    let invite = h.invite.clone();
+    *host = Some(h);
+    Ok(invite)
+}
+
+#[tauri::command]
+async fn tunnel_stop_host(tunnels: State<'_, Tunnels>) -> CmdResult<()> {
+    if let Some(h) = tunnels.host.lock().await.take() {
+        h.stop().await;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn tunnel_decode(code: String) -> CmdResult<tunnel::InviteInfo> {
+    tunnel::Invite::decode(&code).map(|i| i.info()).map_err(err)
+}
+
+/// Connects to a friend's world and starts the chosen instance straight into it.
+#[tauri::command]
+async fn tunnel_join(
+    app: AppHandle,
+    code: String,
+    instance_id: String,
+    tunnels: State<'_, Tunnels>,
+    running: State<'_, Running>,
+) -> CmdResult<()> {
+    if running.0.lock().unwrap().contains_key(&instance_id) {
+        return Err("Эта сборка уже запущена — закройте игру и попробуйте снова".into());
+    }
+    let mut guest = tunnels.guest.lock().await;
+    if let Some(old) = guest.take() {
+        old.stop().await;
+    }
+    let g = tunnel::Guest::connect(&code).await.map_err(err)?;
+    let port = g.local_port;
+    *guest = Some(g);
+    drop(guest);
+    start_game(app, instance_id, running.inner(), Some(port)).await
+}
+
+#[tauri::command]
+async fn tunnel_leave(tunnels: State<'_, Tunnels>) -> CmdResult<()> {
+    if let Some(g) = tunnels.guest.lock().await.take() {
+        g.stop().await;
+    }
+    Ok(())
+}
+
 // ---------- Launcher updates ----------
 
 #[tauri::command]
@@ -562,6 +716,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(Running::default())
+        .manage(Tunnels::default())
         .setup(|app| {
             // The window starts hidden so the saved effect is in place before it appears.
             if let Some(window) = app.get_webview_window("main") {
@@ -613,6 +768,12 @@ pub fn run() {
             launcher_version,
             check_launcher_update,
             install_launcher_update,
+            tunnel_status,
+            tunnel_invite,
+            tunnel_stop_host,
+            tunnel_decode,
+            tunnel_join,
+            tunnel_leave,
             get_appearance,
             save_appearance,
             set_window_style,

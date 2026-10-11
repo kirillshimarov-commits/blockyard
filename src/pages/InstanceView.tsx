@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { save } from "@tauri-apps/plugin-dialog";
-import { api, ContentFolder, errorText, Instance, loaderLabel } from "../api";
+import { api, ContentFolder, errorText, Instance, loaderLabel, TunnelStatus } from "../api";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
@@ -9,10 +9,13 @@ import InstanceCover from "../components/InstanceCover";
 import ContentList from "../components/ContentList";
 import UpdatesModal from "../components/UpdatesModal";
 import InstanceSettingsModal from "../components/InstanceSettingsModal";
+import FriendPanel from "../components/FriendPanel";
 
 interface Props {
   instance?: Instance;
   instances: Instance[];
+  tunnel: TunnelStatus;
+  onTunnelChanged: () => void;
   status?: GameStatus;
   logs: string[];
   onPlay: () => void;
@@ -27,8 +30,8 @@ interface Props {
 type Tab = "mods" | "shaders" | "resourcepacks" | "log";
 
 export default function InstanceView(props: Props) {
-  const { instance, instances, status, logs, onPlay, onStop, onBrowse, onChanged, onDeleted, onDuplicated, notify } =
-    props;
+  const { instance, instances, tunnel, onTunnelChanged, status, logs, onPlay, onStop, onBrowse, onChanged } = props;
+  const { onDeleted, onDuplicated, notify } = props;
   const [showSettings, setShowSettings] = useState(false);
   const [tab, setTab] = useState<Tab>("mods");
   const [showPending, setShowPending] = useState(false);
@@ -155,6 +158,13 @@ export default function InstanceView(props: Props) {
           </div>
         </div>
       )}
+      <FriendPanel
+        instance={instance}
+        running={state === "running"}
+        tunnel={tunnel}
+        onTunnelChanged={onTunnelChanged}
+        notify={notify}
+      />
       {state === "stopped" && status?.error && (
         <div className="error-box crash-box">
           <div className="grow">

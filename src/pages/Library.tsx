@@ -11,11 +11,12 @@ interface Props {
   status: Record<string, GameStatus>;
   onOpen: (id: string) => void;
   onPlay: (id: string) => void;
+  onJoinFriend: () => void;
   onCreated: (inst: Instance) => void;
   notify: (text: string, error?: boolean) => void;
 }
 
-export default function Library({ instances, status, onOpen, onPlay, onCreated, notify }: Props) {
+export default function Library({ instances, status, onOpen, onPlay, onJoinFriend, onCreated, notify }: Props) {
   const [creating, setCreating] = useState(false);
 
   // Named groups first (alphabetically), ungrouped instances last.
@@ -51,6 +52,9 @@ export default function Library({ instances, status, onOpen, onPlay, onCreated, 
           <p className="muted">Ваши сборки Minecraft</p>
         </div>
         <div className="row gap-sm">
+          <button className="btn" title="Зайти в мир друга по коду-приглашению" onClick={onJoinFriend}>
+            <Icon name="users" /> Подключиться к другу
+          </button>
           <button className="btn" title="Открыть .mrpack или модпак CurseForge из файла" onClick={importPack}>
             <Icon name="upload" /> Импорт
           </button>
