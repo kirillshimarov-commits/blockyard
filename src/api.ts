@@ -72,6 +72,8 @@ export interface Settings {
   memoryMb: number;
   /** Show the game inside the launcher window (Windows). */
   embedGame: boolean;
+  /** Install the Blockyard UI mod (launcher-style main menu) where supported. */
+  gameUi: boolean;
   /** UUID of the Microsoft account in use; offline when empty. */
   activeAccount?: string | null;
 }
@@ -206,6 +208,7 @@ export const api = {
   stop: (id: string) => invoke<void>("stop_instance", { id }),
   curseforgeAvailable: () => invoke<boolean>("curseforge_available"),
   minecraftNews: () => invoke<News[]>("minecraft_news"),
+  gameUiAvailable: () => invoke<boolean>("game_ui_available"),
   search: (
     kind: ContentKind,
     source: Source,

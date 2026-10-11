@@ -245,13 +245,17 @@ async fn run_game(
             .await
             .map_err(|e| anyhow::anyhow!("Команда перед запуском не выполнилась: {e:#}"))?;
     }
+    let launcher_settings = settings::load();
+    if let Err(e) = launcher::gameui::sync(&prepared.game_dir, inst, launcher_settings.game_ui) {
+        eprintln!("Blockyard UI mod: {e:#}");
+    }
     let started = std::time::SystemTime::now();
     let mut child = launch::spawn(&prepared)?;
     launch::mark_played(inst)?;
     emit_state(app, &inst.id, "running", None);
 
     // Fullscreen and wrapped launches keep their own window: a wrapper's PID is not the game's.
-    let embed = settings::load().embed_game && !inst.settings.fullscreen && inst.settings.wrapper.trim().is_empty();
+    let embed = launcher_settings.embed_game && !inst.settings.fullscreen && inst.settings.wrapper.trim().is_empty();
     if let (true, Some(pid), Some(parent)) = (embed, child.id(), main_hwnd(app)) {
         let app = app.clone();
         let instance_id = inst.id.clone();
@@ -335,6 +339,11 @@ fn stop_instance(id: String, running: State<'_, Running>) {
 #[tauri::command]
 async fn minecraft_news() -> CmdResult<Vec<launcher::news::News>> {
     launcher::news::latest().await.map_err(err)
+}
+
+#[tauri::command]
+fn game_ui_available() -> bool {
+    launcher::gameui::available()
 }
 
 #[tauri::command]
@@ -787,6 +796,7 @@ pub fn run() {
             stop_instance,
             curseforge_available,
             minecraft_news,
+            game_ui_available,
             search_mods,
             install_mod,
             import_pending_mods,

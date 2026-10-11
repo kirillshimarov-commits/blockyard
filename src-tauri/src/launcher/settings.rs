@@ -13,11 +13,13 @@ pub struct Settings {
     pub active_account: Option<String>,
     /// Show the game inside the launcher window instead of a separate one (Windows).
     pub embed_game: bool,
+    /// Install the Blockyard UI mod (launcher-style main menu) where it is supported.
+    pub game_ui: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { username: "Player".into(), memory_mb: 4096, active_account: None, embed_game: true }
+        Self { username: "Player".into(), memory_mb: 4096, active_account: None, embed_game: true, game_ui: true }
     }
 }
 

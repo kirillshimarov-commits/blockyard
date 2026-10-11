@@ -7,6 +7,7 @@ pub mod curseforge;
 pub mod embed;
 pub mod fabric;
 pub mod forge;
+pub mod gameui;
 pub mod http;
 pub mod instance;
 pub mod java;

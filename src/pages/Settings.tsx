@@ -157,7 +157,7 @@ export default function SettingsPage(props: Props) {
 
   async function save() {
     try {
-      const next = { ...draft, activeAccount: settings.activeAccount, embedGame: settings.embedGame };
+      const next = { ...draft, activeAccount: settings.activeAccount, embedGame: settings.embedGame, gameUi: settings.gameUi };
       await api.saveSettings(next);
       onSaved(next);
       notify("Настройки сохранены");
@@ -256,6 +256,26 @@ export default function SettingsPage(props: Props) {
         <p className="muted small">
           Minecraft появляется прямо в лаунчере, без отдельного окна. Если вместо игры чёрный экран или не работает
           мышь — выключите.
+        </p>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={settings.gameUi ?? true}
+            onChange={async (e) => {
+              const next = { ...settings, gameUi: e.target.checked };
+              try {
+                await api.saveSettings(next);
+                onSaved(next);
+              } catch (err) {
+                notify(errorText(err), true);
+              }
+            }}
+          />
+          Главное меню игры в стиле Blockyard
+        </label>
+        <p className="muted small">
+          Мод Blockyard UI заменяет стандартное меню Minecraft: космос, плитки миров и серверов, белые кнопки. Пока
+          только для Fabric и Quilt 1.21.1, ставится в такие сборки сам при запуске.
         </p>
 
         <h3 className="section-gap">Новые сборки</h3>
