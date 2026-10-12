@@ -8,6 +8,14 @@ base { archivesName = project.archives_base_name }
 
 repositories {}
 
+loom {
+    runs {
+        client {
+            programArgs "--width", "1920", "--height", "1080"
+        }
+    }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
