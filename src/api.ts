@@ -47,6 +47,8 @@ export interface InstanceSettings {
   preLaunch: string;
   wrapper: string;
   postExit: string;
+  /** In-game menus: "" automatic, "on" Blockyard, "off" standard. */
+  gameUi?: "" | "on" | "off";
 }
 
 export interface InstancePatch {

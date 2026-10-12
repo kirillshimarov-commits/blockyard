@@ -254,7 +254,8 @@ async fn run_game(
             .map_err(|e| anyhow::anyhow!("Команда перед запуском не выполнилась: {e:#}"))?;
     }
     let launcher_settings = settings::load();
-    if let Err(e) = launcher::gameui::sync(&prepared.game_dir, inst, launcher_settings.game_ui).await {
+    let game_ui = launcher::gameui::wanted(&inst.settings.game_ui, launcher_settings.game_ui, &prepared.game_dir);
+    if let Err(e) = launcher::gameui::sync(&prepared.game_dir, inst, game_ui).await {
         eprintln!("Blockyard UI mod: {e:#}");
     }
     let started = std::time::SystemTime::now();

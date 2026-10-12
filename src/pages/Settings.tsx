@@ -271,11 +271,11 @@ export default function SettingsPage(props: Props) {
               }
             }}
           />
-          Главное меню игры в стиле Blockyard
+          Меню игры в стиле Blockyard
         </label>
         <p className="muted small">
-          Мод Blockyard UI заменяет стандартное меню Minecraft: космос, плитки миров и серверов, белые кнопки. Пока
-          только для Fabric и Quilt 1.21.1, ставится в такие сборки сам при запуске.
+          Мод Blockyard UI делает меню Minecraft как в лаунчере. Пока только для Fabric и Quilt 1.21.1, ставится в
+          такие сборки сам при запуске. Для отдельной сборки это меняется в её настройках → «Окно и меню».
         </p>
 
         <h3 className="section-gap">Новые сборки</h3>

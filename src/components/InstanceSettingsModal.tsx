@@ -31,7 +31,7 @@ type Section = "general" | "install" | "window" | "java" | "hooks";
 const SECTIONS: { key: Section; label: string; icon: IconName }[] = [
   { key: "general", label: "Основные", icon: "info" },
   { key: "install", label: "Установка", icon: "wrench" },
-  { key: "window", label: "Окно", icon: "monitor" },
+  { key: "window", label: "Окно и меню", icon: "monitor" },
   { key: "java", label: "Java и память", icon: "coffee" },
   { key: "hooks", label: "Команды запуска", icon: "code" },
 ];
@@ -40,6 +40,16 @@ const CHANNELS: { value: InstanceSettings["updateChannel"]; label: string; hint:
   { value: "release", label: "Релиз", hint: "Только релизные версии будут считаться обновлениями." },
   { value: "beta", label: "Бета", hint: "Релизы и бета-версии модов." },
   { value: "alpha", label: "Альфа", hint: "Все версии, включая нестабильные альфы." },
+];
+
+const GAME_UI: { value: "" | "on" | "off"; label: string; hint: string }[] = [
+  {
+    value: "",
+    label: "Авто",
+    hint: "Меню Blockyard, если оно включено в настройках лаунчера и в сборке нет других модов, меняющих меню (FancyMenu, Drippy Loading Screen).",
+  },
+  { value: "on", label: "Blockyard", hint: "Всегда меню в стиле лаунчера (Fabric и Quilt 1.21.1)." },
+  { value: "off", label: "Стандартное", hint: "Обычные меню Minecraft или меню из модов сборки." },
 ];
 
 const LOADERS: Loader["type"][] = ["fabric", "forge", "neoforge", "quilt", "vanilla"];
@@ -355,6 +365,20 @@ export default function InstanceSettingsModal(props: Props) {
                   </label>
                 </div>
                 <p className="muted small">Пусто — размер по умолчанию. Нужно указать и ширину, и высоту.</p>
+
+                <h4>Меню в игре</h4>
+                <div className="chips">
+                  {GAME_UI.map((o) => (
+                    <button
+                      key={o.value}
+                      className={`chip ${(s.gameUi ?? "") === o.value ? "on" : ""}`}
+                      onClick={() => set("gameUi", o.value)}
+                    >
+                      {(s.gameUi ?? "") === o.value && <Icon name="check" size={14} />} {o.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="muted small">{GAME_UI.find((o) => o.value === (s.gameUi ?? ""))?.hint}</p>
               </>
             )}
 

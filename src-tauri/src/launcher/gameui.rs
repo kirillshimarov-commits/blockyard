@@ -26,6 +26,45 @@ pub fn supports(instance: &Instance) -> bool {
     matches!(instance.loader, Loader::Fabric { .. } | Loader::Quilt { .. }) && instance.game_version == "1.21.1"
 }
 
+/// Mods that replace the menus themselves; with one of them the automatic mode stays out of the way.
+const MENU_MODS: &[&str] = &["fancymenu", "drippyloadingscreen", "drippy-loading-screen", "custommainmenu", "custom-main-menu"];
+
+/// Whether the instance should get the mod: the instance's own choice ("on"/"off"), otherwise
+/// the launcher setting, unless another menu mod is installed.
+pub fn wanted(choice: &str, global: bool, game_dir: &Path) -> bool {
+    match choice {
+        "on" => true,
+        "off" => false,
+        _ => global && other_menu_mod(game_dir).is_none(),
+    }
+}
+
+/// File name of an installed mod that changes the menus too, if any.
+pub fn other_menu_mod(game_dir: &Path) -> Option<String> {
+    let entries = std::fs::read_dir(game_dir.join("mods")).ok()?;
+    entries.flatten().map(|e| e.file_name().to_string_lossy().to_string()).find(|name| {
+        let lower = name.to_lowercase().replace(['_', ' '], "-");
+        lower.ends_with(".jar") && MENU_MODS.iter().any(|m| lower.starts_with(m) || lower.contains(&format!("-{m}")))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_menu_mods() {
+        let dir = std::env::temp_dir().join(format!("by-gameui-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("mods")).unwrap();
+        assert!(wanted("", true, &dir));
+        std::fs::write(dir.join("mods").join("fancymenu_fabric_3.2.3_MC_1.21.1.jar"), b"").unwrap();
+        assert!(!wanted("", true, &dir));
+        assert!(wanted("on", true, &dir));
+        assert!(!wanted("off", true, &dir));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}
+
 /// Installs or removes the mod in `game_dir` and writes its settings (the accent color).
 pub async fn sync(game_dir: &Path, instance: &Instance, enabled: bool) -> Result<()> {
     let mods = game_dir.join("mods");

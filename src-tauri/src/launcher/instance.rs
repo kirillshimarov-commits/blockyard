@@ -126,6 +126,9 @@ pub struct InstanceSettings {
     pub wrapper: String,
     /// Shell command run after the game exits.
     pub post_exit: String,
+    /// In-game menus: "" follows the launcher setting (and steps aside for other menu mods),
+    /// "on" always uses the Blockyard menus, "off" keeps the standard ones.
+    pub game_ui: String,
 }
 
 impl InstanceSettings {
