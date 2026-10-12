@@ -22,9 +22,14 @@ public final class AwtCanvas implements Canvas {
     final float w;
 
     AwtCanvas(int pxW, int pxH) {
+        this(pxW, pxH, pxH / 270f);
+    }
+
+    /** One unit = unitPx pixels (vanilla GUI units at a GUI scale). */
+    AwtCanvas(int pxW, int pxH, float unitPx) {
         out = new BufferedImage(pxW, pxH, BufferedImage.TYPE_INT_ARGB);
         g = Raster.quality(out);
-        ppu = pxH / 270f;
+        ppu = unitPx;
         w = pxW / ppu;
     }
 

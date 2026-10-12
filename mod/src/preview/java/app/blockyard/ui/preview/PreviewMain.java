@@ -76,5 +76,6 @@ public final class PreviewMain {
         HomeView.draw(new Frame(c, -100, -100, 3f, ACCENT, false), model, st);
         ImageIO.write(c.out, "png", new File(out, "home.png"));
         Previews.rest(out);
+        VanillaPreviews.render(out);
     }
 }

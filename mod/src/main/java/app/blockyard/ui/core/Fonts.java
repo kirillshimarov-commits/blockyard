@@ -16,6 +16,11 @@ import java.util.Map;
  * the offline previews, so they look identical.
  */
 public final class Fonts {
+    static {
+        // Only fonts and images are used; never let AWT open a display next to the game window.
+        if (System.getProperty("java.awt.headless") == null) System.setProperty("java.awt.headless", "true");
+    }
+
     public enum Face {
         BODY("manrope_semibold.ttf"),
         BOLD("manrope_extrabold.ttf"),

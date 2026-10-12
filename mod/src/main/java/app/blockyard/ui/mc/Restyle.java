@@ -2,7 +2,7 @@ package app.blockyard.ui.mc;
 
 import app.blockyard.ui.BlockyardUi;
 import app.blockyard.ui.core.Fonts;
-import app.blockyard.ui.core.Kit;
+import app.blockyard.ui.core.Widgets;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -32,10 +32,7 @@ import java.util.List;
  * fields, check boxes, tabs, lists and background are drawn in the launcher style.
  */
 public final class Restyle {
-    /** Vanilla text is 9 GUI units per line with the baseline 7 units below the top. */
-    static final Fonts.Style TEXT = new Fonts.Style(Fonts.Face.BODY, 8.5f);
-    static final Fonts.Style TEXT_BOLD = new Fonts.Style(Fonts.Face.BOLD, 8.5f);
-    static final Fonts.Style TITLE = new Fonts.Style(Fonts.Face.HEAD, 10.5f);
+    private static final Fonts.Style TEXT = Widgets.TEXT, TEXT_BOLD = Widgets.TEXT_BOLD, TITLE = Widgets.TITLE;
 
     private static final Deque<Boolean> STACK = new ArrayDeque<>();
     private static int active = 0;
@@ -186,61 +183,19 @@ public final class Restyle {
 
     // ================================================================ widgets
 
-    private static int white(float a) {
-        return Kit.a(a, 0xFFFFFF);
-    }
-
-    /** Text vertically centered in a box, in GUI units. */
-    private static void label(McCanvas c, String s, Fonts.Style st, float x, float cy, int argb) {
-        c.textAt(s, st, x, cy + (Fonts.ascent(st) - Fonts.descent(st)) / 2, argb, 1);
-    }
-
-    /** A vanilla button (also cycling buttons): a glass pill, "label: value" split in two. */
+    /** A vanilla button (also cycling buttons). */
     public static void button(DrawContext ctx, int x, int y, int w, int h, String message, boolean active, boolean hovered, boolean focused, float alpha) {
         McCanvas c = gui(ctx);
         c.alpha = alpha;
-        float px = 1 / c.guiScale();
-        boolean hot = active && (hovered || focused);
-        if (hot) c.glow(x + w / 2f, y + h / 2f + 2, w * 0.6f, h * 1.3f, Kit.a(0.16f, accent()));
-        c.fillRound(x, y, w, h, h / 2f, white(!active ? 0.04f : hot ? 0.17f : 0.09f), white(!active ? 0.04f : hot ? 0.13f : 0.07f),
-                px, white(!active ? 0.06f : hot ? 0.3f : 0.12f));
-        int text = active ? Kit.WHITE : white(0.4f);
-        float cy = y + h / 2f;
-        int split = message.indexOf(": ");
-        if (split > 0 && split < message.length() - 2) {
-            String name = message.substring(0, split), value = message.substring(split + 2);
-            float pad = Math.min(10, h / 2f + 2);
-            float vw = Fonts.width(value, TEXT_BOLD);
-            float avail = w - pad * 2 - vw - 6;
-            label(c, Fonts.fit(name, TEXT, Math.max(10, avail)), TEXT, x + pad, cy, active ? white(0.62f) : white(0.3f));
-            label(c, Fonts.fit(value, TEXT_BOLD, w - pad * 2), TEXT_BOLD, x + w - pad - Math.min(vw, w - pad * 2), cy, text);
-        } else {
-            String s = Fonts.fit(message, TEXT, w - 8);
-            label(c, s, TEXT, Math.round(x + w / 2f - Fonts.width(s, TEXT) / 2), cy, text);
-        }
+        Widgets.button(c, x, y, w, h, message, active, hovered || focused, accent());
     }
 
-    /** A tab of a tab bar (create world): a white pill when current, like the launcher's tabs. */
     public static void tab(DrawContext ctx, int x, int y, int w, int h, String message, boolean current, boolean hovered, boolean active) {
-        McCanvas c = gui(ctx);
-        Fonts.Style st = current ? TEXT_BOLD : TEXT;
-        float tw = Fonts.width(message, st);
-        float pw = Math.min(w - 2, tw + 18), ph = Math.min(h - 4, 17);
-        float px = Math.round(x + (w - pw) / 2), py = Math.round(y + (h - ph) / 2);
-        if (current) {
-            c.glow(px + pw / 2, py + ph / 2 + 1, pw * 0.75f, ph * 1.1f, white(0.10f));
-            c.fillRound(px, py, pw, ph, ph / 2, Kit.WHITE);
-        } else if (hovered) {
-            c.fillRound(px, py, pw, ph, ph / 2, white(0.07f));
-        }
-        int color = current ? Kit.INK : white(!active ? 0.35f : hovered ? 1f : 0.72f);
-        label(c, message, st, Math.round(px + pw / 2 - tw / 2), py + ph / 2, color);
+        Widgets.tab(gui(ctx), x, y, w, h, message, current, hovered, active);
     }
 
-    /** Highlight of the selected row of a list. */
     public static void selection(DrawContext ctx, int x0, int y0, int x1, int y1) {
-        McCanvas c = gui(ctx);
-        c.fillRound(x0, y0, x1 - x0, y1 - y0, 4, white(0.08f), white(0.06f), 1 / c.guiScale(), Kit.a(0.7f, accent()));
+        Widgets.selection(gui(ctx), x0, y0, x1, y1, accent());
     }
 
     private static float sliderX, sliderY, sliderW, sliderH;
@@ -250,71 +205,29 @@ public final class Restyle {
         if (!active() || !"minecraft".equals(id.getNamespace())) return false;
         String p = id.getPath();
         if (!p.startsWith("widget/")) return false;
-        McCanvas c;
+        boolean hot = p.endsWith("highlighted");
         switch (p) {
-            case "widget/button", "widget/button_highlighted", "widget/button_disabled" -> {
-                c = gui(ctx);
-                boolean hot = p.endsWith("highlighted"), off = p.endsWith("disabled");
-                c.fillRound(x, y, w, h, h / 2f, white(off ? 0.04f : hot ? 0.17f : 0.09f), white(off ? 0.04f : hot ? 0.13f : 0.07f),
-                        1 / c.guiScale(), white(off ? 0.06f : hot ? 0.3f : 0.12f));
-            }
-            case "widget/text_field", "widget/text_field_highlighted" -> {
-                c = gui(ctx);
-                boolean focus = p.endsWith("highlighted");
-                c.fillRound(x, y, w, h, Math.min(5, h / 2f), white(focus ? 0.10f : 0.07f), white(focus ? 0.10f : 0.07f),
-                        (focus ? 1.5f : 1) / c.guiScale(), focus ? white(0.55f) : white(0.12f));
-            }
+            case "widget/button", "widget/button_highlighted", "widget/button_disabled" ->
+                    Widgets.buttonShape(gui(ctx), x, y, w, h, !p.endsWith("disabled"), hot);
+            case "widget/text_field", "widget/text_field_highlighted" -> Widgets.textField(gui(ctx), x, y, w, h, hot);
             case "widget/slider", "widget/slider_highlighted" -> {
-                c = gui(ctx);
                 sliderX = x;
                 sliderY = y;
                 sliderW = w;
                 sliderH = h;
-                boolean hot = p.endsWith("highlighted");
-                c.fillRound(x, y, w, h, Math.min(6, h / 2f), white(hot ? 0.10f : 0.07f), white(hot ? 0.10f : 0.07f),
-                        1 / c.guiScale(), white(hot ? 0.22f : 0.1f));
+                Widgets.sliderTrack(gui(ctx), x, y, w, h, hot);
             }
             case "widget/slider_handle", "widget/slider_handle_highlighted" -> {
-                c = gui(ctx);
-                boolean hot = p.endsWith("highlighted");
                 float cx = x + w / 2f;
                 boolean inside = sliderW > 0 && cx >= sliderX && cx <= sliderX + sliderW && Math.abs(y - sliderY) < 1;
-                float sx = inside ? sliderX : x, sh = inside ? sliderH : h;
-                float r = Math.min(6, sh / 2f);
-                int a = accent();
-                // Filled part in the accent color, then a bright knob.
-                c.fillRound(sx, y, Math.max(r * 2, cx - sx + 3), sh, r, Kit.a(0.75f, Kit.mix(a, 0xFFFFFF, 0.12f)), Kit.a(0.6f, a), 0, 0);
-                c.glow(cx, y + sh / 2f, hot ? 12 : 9, sh * (hot ? 0.9f : 0.7f), Kit.a(hot ? 0.55f : 0.35f, a));
-                c.fillRound(cx - 2, y + 3, 4, sh - 6, 2, Kit.WHITE);
+                Widgets.sliderFill(gui(ctx), inside ? sliderX : x, y, inside ? sliderH : h, cx, hot, accent());
             }
-            case "widget/checkbox", "widget/checkbox_highlighted", "widget/checkbox_selected", "widget/checkbox_selected_highlighted" -> {
-                c = gui(ctx);
-                boolean on = p.contains("selected"), hot = p.endsWith("highlighted");
-                float s = Math.min(w, h);
-                if (on) {
-                    c.glow(x + s / 2f, y + s / 2f, s, s, Kit.a(hot ? 0.45f : 0.3f, accent()));
-                    c.fillRound(x, y, s, s, s * 0.28f, 0xFF000000 | Kit.mix(accent(), 0xFFFFFF, 0.1f), 0xFF000000 | accent(), 0, 0);
-                    c.icon("check", x + s * 0.15f, y + s * 0.15f, s * 0.7f, Kit.WHITE);
-                } else {
-                    c.fillRound(x, y, s, s, s * 0.28f, white(hot ? 0.12f : 0.07f), white(hot ? 0.12f : 0.07f),
-                            1.5f / c.guiScale(), white(hot ? 0.6f : 0.3f));
-                }
-            }
-            case "widget/scroller" -> {
-                c = gui(ctx);
-                c.fillRound(x + w / 2f - 1.5f, y, 3, h, 1.5f, white(0.38f));
-            }
-            case "widget/scroller_background" -> {
-                c = gui(ctx);
-                c.fillRound(x + w / 2f - 1.5f, y, 3, h, 1.5f, white(0.06f));
-            }
-            case "widget/tab", "widget/tab_highlighted", "widget/tab_selected", "widget/tab_selected_highlighted" -> {
-                c = gui(ctx);
-                boolean on = p.contains("selected"), hot = p.endsWith("highlighted");
-                float ph = Math.min(h - 4, 17), py = y + (h - ph) / 2f;
-                if (on) c.fillRound(x + 2, py, w - 4, ph, ph / 2, 0xFF000000 | accent());
-                else if (hot) c.fillRound(x + 2, py, w - 4, ph, ph / 2, white(0.07f));
-            }
+            case "widget/checkbox", "widget/checkbox_highlighted", "widget/checkbox_selected", "widget/checkbox_selected_highlighted" ->
+                    Widgets.checkbox(gui(ctx), x, y, Math.min(w, h), p.contains("selected"), hot, accent());
+            case "widget/scroller" -> Widgets.scroller(gui(ctx), x, y, w, h, false);
+            case "widget/scroller_background" -> Widgets.scroller(gui(ctx), x, y, w, h, true);
+            case "widget/tab", "widget/tab_highlighted", "widget/tab_selected", "widget/tab_selected_highlighted" ->
+                    Widgets.tabShape(gui(ctx), x, y, w, h, p.contains("selected"), hot, accent());
             default -> {
                 return false;
             }
@@ -327,13 +240,11 @@ public final class Restyle {
         if (!active()) return false;
         String p = id.getPath();
         if (p.contains("menu_list_background")) {
-            McCanvas c = gui(ctx);
-            c.rect(x, y, w, h, white(0.025f));
+            Widgets.listBand(gui(ctx), x, y, w, h);
             return true;
         }
         if (p.contains("header_separator") || p.contains("footer_separator")) {
-            McCanvas c = gui(ctx);
-            c.rect(x, y + h / 2f - 0.5f / c.guiScale() * 2, w, 1 / c.guiScale(), white(0.08f));
+            Widgets.separator(gui(ctx), x, y, w, h);
             return true;
         }
         return p.contains("tab_header_background") || p.endsWith("menu_background.png");

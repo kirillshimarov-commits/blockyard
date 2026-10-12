@@ -1,8 +1,10 @@
 package app.blockyard.ui.mixin;
 
 import app.blockyard.ui.mc.Restyle;
+import app.blockyard.ui.mc.Screens;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.MessageScreen;
 import net.minecraft.client.gui.screen.Screen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -72,6 +74,16 @@ public abstract class ScreenMixin {
     @Inject(method = "clearAndInit", at = @At("RETURN"), require = 0)
     private void blockyard$endReinit(CallbackInfo ci) {
         Restyle.end();
+    }
+
+    /** The saving screen has no render of its own: it gets the loading look here. */
+    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
+    private void blockyard$message(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        Object self = this;
+        if (self instanceof MessageScreen screen) {
+            Screens.loading(screen, context, screen.getTitle().getString());
+            ci.cancel();
+        }
     }
 
     @Inject(method = "renderBackground", at = @At("HEAD"), cancellable = true)
