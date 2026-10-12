@@ -5,7 +5,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.MessageScreen;
 import net.minecraft.client.gui.screen.advancement.AdvancementsScreen;
 import net.minecraft.client.gui.screen.StatsScreen;
-import net.minecraft.client.util.NetworkUtils;
+import net.minecraft.util.NetworkUtils;
 import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;

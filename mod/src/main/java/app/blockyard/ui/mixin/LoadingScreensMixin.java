@@ -3,7 +3,7 @@ package app.blockyard.ui.mixin;
 import app.blockyard.ui.screen.LoadingView;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.DownloadingTerrainScreen;
-import net.minecraft.client.gui.screen.LevelLoadingScreen;
+import net.minecraft.client.gui.screen.world.LevelLoadingScreen;
 import net.minecraft.client.gui.screen.MessageScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /** Draws the loading screens in the Blockyard style instead of the vanilla dirt and text. */
 @Mixin({ConnectScreen.class, LevelLoadingScreen.class, DownloadingTerrainScreen.class, MessageScreen.class})
 public abstract class LoadingScreensMixin {
-    @Inject(method = "render", at = @At("HEAD"), cancellable = true, require = 0)
+    @Inject(method = "render(Lnet/minecraft/client/gui/DrawContext;IIF)V", at = @At("HEAD"), cancellable = true, require = 0)
     private void blockyard$render(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         Object self = this;
         String status;
