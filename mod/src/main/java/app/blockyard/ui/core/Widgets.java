@@ -58,20 +58,58 @@ public final class Widgets {
         }
     }
 
-    /** A tab: a white pill when current, like the launcher's tab bar. */
+    /** The glass bar holding a row of tabs, like the launcher's top tabs. */
+    public static void tabBar(Canvas c, float x0, float y0, float x1, float y1) {
+        float h = y1 - y0;
+        c.shadow(x0, y0 + 1.5f, x1 - x0, h, h / 2, 6, 0.25f);
+        c.fillRound(x0, y0, x1 - x0, h, h / 2, white(0.06f), white(0.06f), px(c), white(0.11f));
+    }
+
+    /** A tab inside the bar: a white pill when current. */
     public static void tab(Canvas c, float x, float y, float w, float h, String message, boolean current, boolean hot, boolean active) {
         Fonts.Style st = current ? TEXT_BOLD : TEXT;
         float tw = Fonts.width(message, st);
-        float pw = Math.min(w - 2, tw + 18), ph = Math.min(h - 4, 17);
-        float px = Math.round(x + (w - pw) / 2), py = Math.round(y + (h - ph) / 2);
+        float pw = w - 4, ph = h - 6;
+        float px = Math.round(x + 2), py = Math.round(y + 3);
         if (current) {
-            c.glow(px + pw / 2, py + ph / 2 + 1, pw * 0.75f, ph * 1.1f, white(0.10f));
+            c.glow(px + pw / 2, py + ph / 2 + 1, pw * 0.6f, ph * 1.1f, white(0.10f));
             c.fillRound(px, py, pw, ph, ph / 2, Kit.WHITE);
         } else if (hot) {
-            c.fillRound(px, py, pw, ph, ph / 2, white(0.07f));
+            c.fillRound(px, py, pw, ph, ph / 2, white(0.08f));
         }
         int color = current ? Kit.INK : white(!active ? 0.35f : hot ? 1f : 0.72f);
-        label(c, message, st, Math.round(px + pw / 2 - tw / 2), py + ph / 2, color);
+        label(c, Fonts.fit(message, st, pw - 6), st, Math.round(px + pw / 2 - Math.min(tw, pw - 6) / 2), py + ph / 2, color);
+    }
+
+    /**
+     * A vanilla slider: a glass pill with the name on the left, the value on the right and an accent
+     * track with a knob along its bottom edge, so the text is never covered.
+     */
+    public static void slider(Canvas c, float x, float y, float w, float h, String message, float value, boolean active, boolean hot, int accent) {
+        hot = active && hot;
+        value = Math.max(0, Math.min(1, value));
+        if (hot) c.glow(x + w / 2f, y + h / 2f + 2, w * 0.6f, h * 1.3f, Kit.a(0.14f, accent));
+        buttonShape(c, x, y, w, h, active, hot);
+        float pad = Math.min(10, h / 2f + 2);
+        float cy = y + h / 2f - 2;
+        int split = message.indexOf(": ");
+        int text = active ? Kit.WHITE : white(0.4f);
+        if (split > 0 && split < message.length() - 2) {
+            String name = message.substring(0, split), val = message.substring(split + 2);
+            float vw = Math.min(Fonts.width(val, TEXT_BOLD), w - pad * 2);
+            label(c, Fonts.fit(name, TEXT, Math.max(10, w - pad * 2 - vw - 6)), TEXT, x + pad, cy, active ? white(0.62f) : white(0.3f));
+            label(c, Fonts.fit(val, TEXT_BOLD, w - pad * 2), TEXT_BOLD, x + w - pad - vw, cy, text);
+        } else {
+            String s = Fonts.fit(message, TEXT, w - pad * 2);
+            label(c, s, TEXT, Math.round(x + w / 2f - Fonts.width(s, TEXT) / 2), cy, text);
+        }
+        float tx = x + pad, tw = w - pad * 2, ty = y + h - 4.5f;
+        c.fillRound(tx, ty - 0.75f, tw, 1.5f, 0.75f, white(0.14f));
+        float kx = tx + tw * value;
+        c.fillRound(tx, ty - 0.75f, Math.max(1.5f, kx - tx), 1.5f, 0.75f, active ? 0xFF000000 | accent : white(0.3f));
+        if (active) c.glow(kx, ty, hot ? 6 : 4.5f, hot ? 6 : 4.5f, Kit.a(hot ? 0.5f : 0.3f, accent));
+        c.disk(kx, ty, 2.25f, Kit.WHITE);
+        if (active) c.disk(kx, ty, 0.9f, 0xFF000000 | accent);
     }
 
     public static void selection(Canvas c, float x0, float y0, float x1, float y1, int accent) {

@@ -61,7 +61,9 @@ public final class Screens {
         float sy = mc.getWindow().getFramebufferHeight() / (float) Math.max(1, mc.getWindow().getHeight());
         float mx = (float) mc.mouse.getX() * sx / c.ppu(), my = (float) mc.mouse.getY() * sy / c.ppu();
         Frame f = new Frame(c, mx, my, UiScreen.seconds(), BlockyardUi.accent, false);
-        String title = BlockyardUi.loadingTitle != null ? BlockyardUi.loadingTitle : "Minecraft";
+        String title = BlockyardUi.loadingTitle;
+        if (title == null && mc.getServer() != null) title = mc.getServer().getSaveProperties().getLevelName();
+        if (title == null) title = "Minecraft";
         LoadingView.draw(f, title, status, BlockyardUi.loadingIcon, BlockyardUi.loadingKey, -1);
         float u = c.guiScale() / c.ppu();
         for (Element e : screen.children()) {

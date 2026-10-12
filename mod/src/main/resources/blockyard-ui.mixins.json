@@ -11,7 +11,9 @@
     "TextRendererMixin",
     "PressableWidgetMixin",
     "TabButtonWidgetMixin",
-    "EntryListWidgetMixin"
+    "EntryListWidgetMixin",
+    "SliderWidgetMixin",
+    "TabNavigationWidgetMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
