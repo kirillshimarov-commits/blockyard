@@ -77,11 +77,16 @@ public final class McCanvas implements Canvas {
 
     private Matrix4f matrix;
 
-    private BufferBuilder begin(TextureCache.Entry e, boolean additive) {
+    /**
+     * Starts a batch of quads with one texture and one premultiplied color. The color goes through
+     * the shader color: position_tex keeps every non-zero alpha, while the vertex-color GUI shader
+     * throws away anything under 10% opacity (which ate the glass, the glows and the beams).
+     */
+    private BufferBuilder begin(TextureCache.Entry e, boolean additive, int color) {
         matrix = ctx.getMatrices().peek().getPositionMatrix();
-        RenderSystem.setShader(GameRenderer::getPositionTexColorProgram);
+        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
         RenderSystem.setShaderTexture(0, e.id());
-        RenderSystem.setShaderColor(1, 1, 1, 1);
+        RenderSystem.setShaderColor(((color >> 16) & 255) / 255f, ((color >> 8) & 255) / 255f, (color & 255) / 255f, ((color >>> 24) & 255) / 255f);
         RenderSystem.enableBlend();
         RenderSystem.disableDepthTest();
         if (additive) {
@@ -90,11 +95,12 @@ public final class McCanvas implements Canvas {
             RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA,
                     GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
         }
-        return Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+        return Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
     }
 
     private void end(BufferBuilder b) {
         BufferRenderer.drawWithGlobalProgram(b.end());
+        RenderSystem.setShaderColor(1, 1, 1, 1);
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
     }
@@ -107,23 +113,22 @@ public final class McCanvas implements Canvas {
         return (ai << 24) | (r << 16) | (g << 8) | b;
     }
 
-    private void vtx(BufferBuilder b, float x, float y, float u, float v, int color) {
-        b.vertex(matrix, x / gs, y / gs, 0).texture(u, v).color(color);
+    private void vtx(BufferBuilder b, float x, float y, float u, float v) {
+        b.vertex(matrix, x / gs, y / gs, 0).texture(u, v);
     }
 
-    /** One axis-aligned quad in pixels; colors already premultiplied. */
-    private void quad(BufferBuilder b, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, int top, int bottom) {
-        vtx(b, x0, y0, u0, v0, top);
-        vtx(b, x0, y1, u0, v1, bottom);
-        vtx(b, x1, y1, u1, v1, bottom);
-        vtx(b, x1, y0, u1, v0, top);
+    /** One axis-aligned quad in pixels. */
+    private void quad(BufferBuilder b, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1) {
+        vtx(b, x0, y0, u0, v0);
+        vtx(b, x0, y1, u0, v1);
+        vtx(b, x1, y1, u1, v1);
+        vtx(b, x1, y0, u1, v0);
     }
 
     private void blit(TextureCache.Entry e, float x, float y, float w, float h, int argb, boolean additive) {
         if (((argb >>> 24) & 255) == 0 || alpha <= 0) return;
-        int c = pm(argb);
-        BufferBuilder b = begin(e, additive);
-        quad(b, x, y, x + w, y + h, 0, 0, 1, 1, c, c);
+        BufferBuilder b = begin(e, additive, pm(argb));
+        quad(b, x, y, x + w, y + h, 0, 0, 1, 1);
         end(b);
     }
 
@@ -141,16 +146,24 @@ public final class McCanvas implements Canvas {
         if (sp > 0 && (strokeColor >>> 24) != 0) shape(x0, y0, W, H, rp, Math.max(sp, 0.75f), strokeColor, strokeColor);
     }
 
-    /** A white rounded shape (filled, or a ring of width sp) tinted top to bottom; nine-sliced when big. */
+    /** A rounded shape (filled, or a ring of width sp); nine-sliced and tinted when it is one color. */
     private void shape(int x0, int y0, int W, int H, float rp, float sp, int top, int bottom) {
         int corner = (int) Math.ceil(Math.max(rp, sp)) + 1;
         int T = corner * 2 + 1;
+        if (top != bottom) {
+            // Gradients are baked into the texture at their exact size.
+            TextureCache.Entry e = TextureCache.get("g|" + W + "|" + H + "|" + q(rp) + "|" + top + "|" + bottom, false,
+                    () -> Raster.round(W, H, rp, top, bottom, 0, 0));
+            BufferBuilder b = begin(e, false, pm(WHITE));
+            quad(b, x0, y0, x0 + W, y0 + H, 0, 0, 1, 1);
+            end(b);
+            return;
+        }
         if (W < T || H < T) {
             TextureCache.Entry e = TextureCache.get("f|" + W + "|" + H + "|" + q(rp) + "|" + q(sp), false,
                     () -> sp > 0 ? Raster.round(W, H, rp, 0, 0, sp, WHITE) : Raster.round(W, H, rp, WHITE, WHITE, 0, 0));
-            int ct = pm(top), cb = pm(bottom);
-            BufferBuilder b = begin(e, false);
-            quad(b, x0, y0, x0 + W, y0 + H, 0, 0, 1, 1, ct, cb);
+            BufferBuilder b = begin(e, false, pm(top));
+            quad(b, x0, y0, x0 + W, y0 + H, 0, 0, 1, 1);
             end(b);
             return;
         }
@@ -159,25 +172,13 @@ public final class McCanvas implements Canvas {
         float[] xs = {x0, x0 + corner, x0 + W - corner, x0 + W};
         float[] ys = {y0, y0 + corner, y0 + H - corner, y0 + H};
         float[] us = {0, corner / (float) T, (corner + 1) / (float) T, 1};
-        int[] cs = new int[4];
-        for (int i = 0; i < 4; i++) cs[i] = pm(lerpArgb(top, bottom, (ys[i] - y0) / H));
-        BufferBuilder b = begin(e, false);
+        BufferBuilder b = begin(e, false, pm(top));
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
-                quad(b, xs[col], ys[row], xs[col + 1], ys[row + 1], us[col], us[row], us[col + 1], us[row + 1], cs[row], cs[row + 1]);
+                quad(b, xs[col], ys[row], xs[col + 1], ys[row + 1], us[col], us[row], us[col + 1], us[row + 1]);
             }
         }
         end(b);
-    }
-
-    private static int lerpArgb(int a, int b, float t) {
-        if (a == b) return a;
-        int out = 0;
-        for (int shift = 0; shift < 32; shift += 8) {
-            int ca = (a >>> shift) & 255, cb = (b >>> shift) & 255;
-            out |= Math.round(ca + (cb - ca) * t) << shift;
-        }
-        return out;
     }
 
     public void shadow(float x, float y, float w, float h, float r, float blur, float alpha) {
@@ -280,40 +281,33 @@ public final class McCanvas implements Canvas {
         float lx0 = -bw / 2 - pad * scale, ly0 = -pad * scale;
         float lx1 = lx0 + bw + pad * 2 * scale, ly1 = ly0 + bh + pad * 2 * scale;
         float a = opacity * (0.9f - 0.3f * phase);
-        int c = pm((Math.round(a * 255) << 24) | 0xFFFFFF);
-        BufferBuilder b = begin(e, true);
+        BufferBuilder b = begin(e, true, pm((Math.round(a * 255) << 24) | 0xFFFFFF));
         float[][] pts = {{lx0, ly0, 0, 0}, {lx0, ly1, 0, 1}, {lx1, ly1, 1, 1}, {lx1, ly0, 1, 0}};
-        for (float[] p : pts) vtx(b, ox + p[0] * cos - p[1] * sin, oy + p[0] * sin + p[1] * cos, p[2], p[3], c);
+        for (float[] p : pts) vtx(b, ox + p[0] * cos - p[1] * sin, oy + p[0] * sin + p[1] * cos, p[2], p[3]);
         end(b);
     }
 
     private void stars(int accent, float t, float cssW, float cssH, float css) {
         int sc = SpaceArt.starColor(accent);
-        Map<Integer, java.util.List<float[]>> bySize = new HashMap<>();
+        // Batched by size and by alpha in 24 steps: one draw per group.
+        Map<Integer, java.util.List<float[]>> groups = new HashMap<>();
         for (SpaceArt.Star s : SpaceArt.stars(cssW, cssH, t)) {
             int size = Math.max(1, Math.round(s.r() * 2 * css));
-            bySize.computeIfAbsent(size, k -> new java.util.ArrayList<>())
-                    .add(new float[]{Math.round((s.x() - s.r()) * css), Math.round((s.y() - s.r()) * css), s.alpha()});
+            int level = Math.max(1, Math.min(24, Math.round(s.alpha() * 24)));
+            groups.computeIfAbsent(size * 100 + level, k -> new java.util.ArrayList<>())
+                    .add(new float[]{Math.round((s.x() - s.r()) * css), Math.round((s.y() - s.r()) * css)});
         }
-        for (Map.Entry<Integer, java.util.List<float[]>> en : bySize.entrySet()) {
-            int size = en.getKey();
-            BufferBuilder b = begin(disk(size), false);
-            for (float[] p : en.getValue()) {
-                int c = pm((Math.max(0, Math.min(255, Math.round(p[2] * 255))) << 24) | sc);
-                quad(b, p[0], p[1], p[0] + size, p[1] + size, 0, 0, 1, 1, c, c);
-            }
+        for (Map.Entry<Integer, java.util.List<float[]>> en : groups.entrySet()) {
+            int size = en.getKey() / 100, level = en.getKey() % 100;
+            BufferBuilder b = begin(disk(size), false, pm((Math.round(level / 24f * 255) << 24) | sc));
+            for (float[] p : en.getValue()) quad(b, p[0], p[1], p[0] + size, p[1] + size, 0, 0, 1, 1);
             end(b);
         }
-        SpaceArt.Bokeh[] bokeh = SpaceArt.bokeh(cssW, cssH, t);
-        if (bokeh.length == 0) return;
-        BufferBuilder b = begin(glowTex(), true);
-        for (SpaceArt.Bokeh k : bokeh) {
+        for (SpaceArt.Bokeh k : SpaceArt.bokeh(cssW, cssH, t)) {
             float r = k.r() * 4 * css;
             float x0 = Math.round(k.x() * css - r), y0 = Math.round(k.y() * css - r), x1 = Math.round(k.x() * css + r), y1 = Math.round(k.y() * css + r);
-            int c = pm((Math.max(0, Math.min(255, Math.round(k.alpha() * 255))) << 24) | (accent & 0xFFFFFF));
-            quad(b, x0, y0, x1, y1, 0, 0, 1, 1, c, c);
+            blit(glowTex(), x0, y0, x1 - x0, y1 - y0, (Math.max(0, Math.min(255, Math.round(k.alpha() * 255))) << 24) | (accent & 0xFFFFFF), true);
         }
-        end(b);
     }
 
     public void fillScreen(int argb) {

@@ -16,6 +16,8 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 
 /** Which vanilla screen becomes which Blockyard screen, and the loading screens' look. */
 public final class Screens {
+    private static java.lang.ref.WeakReference<Screen> allowedOptions;
+
     private Screens() {}
 
     public static Screen replace(MinecraftClient client, Screen screen) {
@@ -31,10 +33,14 @@ public final class Screens {
         }
         if (screen instanceof MultiplayerScreen) return new HomeScreen(HomeView.MULTI);
         if (screen instanceof OptionsScreen) {
+            // The vanilla options asked for from our settings stay vanilla, also when their
+            // sub-screens (Sodium's video settings and others) go back to them.
             if (BlockyardUi.vanillaOptions) {
                 BlockyardUi.vanillaOptions = false;
+                allowedOptions = new java.lang.ref.WeakReference<>(screen);
                 return screen;
             }
+            if (allowedOptions != null && allowedOptions.get() == screen) return screen;
             return new SettingsScreen(client.currentScreen, SettingsScreen.GENERAL);
         }
         if (screen instanceof GameMenuScreen menu && menu.shouldShowMenu()) return new PauseScreen();

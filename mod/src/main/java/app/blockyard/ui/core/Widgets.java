@@ -31,10 +31,10 @@ public final class Widgets {
         text(c, s, st, x, cy + (Fonts.ascent(st) - Fonts.descent(st)) / 2, argb);
     }
 
-    /** Button background: a glass pill. */
+    /** Button background: a glass pill with a hairline, like the launcher's tab bar. */
     public static void buttonShape(Canvas c, float x, float y, float w, float h, boolean active, boolean hot) {
-        c.fillRound(x, y, w, h, h / 2f, white(!active ? 0.04f : hot ? 0.17f : 0.09f), white(!active ? 0.04f : hot ? 0.13f : 0.07f),
-                px(c), white(!active ? 0.06f : hot ? 0.3f : 0.12f));
+        float f = !active ? 0.035f : hot ? 0.15f : 0.075f;
+        c.fillRound(x, y, w, h, h / 2f, white(f), white(f), px(c), white(!active ? 0.06f : hot ? 0.32f : 0.14f));
     }
 
     /** A button with its label; "name: value" (cycling buttons) is laid out as name left, value right. */
