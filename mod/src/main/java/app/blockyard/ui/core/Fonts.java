@@ -47,8 +47,33 @@ public final class Fonts {
 
     private Fonts() {}
 
+    /** The launcher's font (Segoe UI) when the system has it, as on Windows. */
+    private static Boolean segoe;
+
+    private static boolean hasSegoe() {
+        if (segoe == null) {
+            boolean found = false;
+            try {
+                for (String name : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames(java.util.Locale.ROOT)) {
+                    if (name.equalsIgnoreCase("Segoe UI")) found = true;
+                }
+            } catch (Throwable ignored) {
+                // No system fonts: the bundled ones.
+            }
+            segoe = found;
+        }
+        return segoe;
+    }
+
     static Font base(Face face) {
         return BASE.computeIfAbsent(face, f -> {
+            if (hasSegoe()) {
+                if (f == Face.BODY) {
+                    Font semi = new Font("Segoe UI Semibold", Font.PLAIN, 1);
+                    return semi.getFamily(java.util.Locale.ROOT).equalsIgnoreCase("Dialog") ? new Font("Segoe UI", Font.PLAIN, 1) : semi;
+                }
+                return new Font("Segoe UI", Font.BOLD, 1);
+            }
             try (InputStream in = Fonts.class.getResourceAsStream("/assets/blockyard-ui/font/" + f.file)) {
                 return Font.createFont(Font.TRUETYPE_FONT, in);
             } catch (Exception e) {

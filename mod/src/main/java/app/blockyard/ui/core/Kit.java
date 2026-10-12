@@ -23,7 +23,7 @@ public final class Kit {
     public static final Fonts.Style SUB = new Fonts.Style(Fonts.Face.BODY, 3.125f);     // 12.5px
     public static final Fonts.Style LINK = new Fonts.Style(Fonts.Face.BOLD, 3.25f);
     public static final Fonts.Style PLAY = new Fonts.Style(Fonts.Face.BOLD, 5f);        // 20px
-    public static final Fonts.Style H1 = new Fonts.Style(Fonts.Face.HEAD, 16f);         // 64px
+    public static final Fonts.Style H1 = new Fonts.Style(Fonts.Face.HEAD, 17f, -0.02f); // 68px, like .hero-title
     public static final Fonts.Style H2 = new Fonts.Style(Fonts.Face.HEAD, 7.5f);        // 30px
     public static final Fonts.Style H2_PAUSE = new Fonts.Style(Fonts.Face.HEAD, 8.5f);  // 34px
     public static final Fonts.Style H2_MODAL = new Fonts.Style(Fonts.Face.HEAD, 7f);    // 28px
