@@ -4,12 +4,17 @@
 //! instances it supports; it is removed again when the feature is off or the instance changes.
 
 use super::appearance;
+use super::http::{self, Download};
 use super::instance::{Instance, Loader};
+use super::modrinth;
 use anyhow::Result;
 use std::path::Path;
 
 static JAR: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/blockyard-ui.jar"));
 const FILE_NAME: &str = "blockyard-ui.jar";
+/// Fabric API loads the mod's fonts and textures; installed alongside when the user has none.
+const FABRIC_API: &str = "P7dR8mSH";
+const FABRIC_API_FILE: &str = "blockyard-fabric-api.jar";
 
 /// Whether this launcher build carries the mod.
 pub fn available() -> bool {
@@ -22,18 +27,24 @@ pub fn supports(instance: &Instance) -> bool {
 }
 
 /// Installs or removes the mod in `game_dir` and writes its settings (the accent color).
-pub fn sync(game_dir: &Path, instance: &Instance, enabled: bool) -> Result<()> {
-    let jar = game_dir.join("mods").join(FILE_NAME);
+pub async fn sync(game_dir: &Path, instance: &Instance, enabled: bool) -> Result<()> {
+    let mods = game_dir.join("mods");
+    let jar = mods.join(FILE_NAME);
+    let api = mods.join(FABRIC_API_FILE);
     if !(enabled && available() && supports(instance)) {
-        if jar.exists() {
-            std::fs::remove_file(&jar)?;
+        for file in [&jar, &api] {
+            if file.exists() {
+                std::fs::remove_file(file)?;
+            }
         }
         return Ok(());
     }
-    std::fs::create_dir_all(game_dir.join("mods"))?;
+    std::fs::create_dir_all(&mods)?;
     if std::fs::read(&jar).ok().as_deref() != Some(JAR) {
         std::fs::write(&jar, JAR)?;
     }
+    ensure_fabric_api(&mods, instance).await?;
+
     let saved = appearance::load();
     let accent = appearance::field(&saved, "accent", "#8b5cff");
     std::fs::create_dir_all(game_dir.join("config"))?;
@@ -42,4 +53,31 @@ pub fn sync(game_dir: &Path, instance: &Instance, enabled: bool) -> Result<()> {
         serde_json::json!({ "accent": accent }).to_string(),
     )?;
     Ok(())
+}
+
+/// Keeps exactly one Fabric API: the user's own if they installed it, otherwise ours.
+async fn ensure_fabric_api(mods: &Path, instance: &Instance) -> Result<()> {
+    let ours = mods.join(FABRIC_API_FILE);
+    let user_has_it = instance.mods.iter().any(|m| m.project_id == FABRIC_API && !m.disabled)
+        || std::fs::read_dir(mods)?.flatten().any(|e| {
+            let name = e.file_name().to_string_lossy().to_lowercase();
+            name.starts_with("fabric-api") && name.ends_with(".jar")
+        });
+    if user_has_it {
+        if ours.exists() {
+            std::fs::remove_file(&ours)?;
+        }
+        return Ok(());
+    }
+    if ours.exists() {
+        return Ok(());
+    }
+    let loaders: &[&str] = &["fabric"];
+    let Some(version) = modrinth::latest_version(FABRIC_API, Some(&instance.game_version), Some(loaders)).await? else {
+        return Ok(());
+    };
+    let Some(file) = version.files.iter().find(|f| f.primary).or(version.files.first()) else {
+        return Ok(());
+    };
+    http::download(&Download { url: file.url.clone(), path: ours, sha1: file.hashes.sha1.clone() }).await
 }

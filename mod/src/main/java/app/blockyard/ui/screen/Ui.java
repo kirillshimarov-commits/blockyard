@@ -30,6 +30,7 @@ import java.util.Map;
 final class Ui {
     static final Identifier BODY = Identifier.of("blockyard-ui", "body");
     static final Identifier BOLD = Identifier.of("blockyard-ui", "bold");
+    static final Identifier SMALL = Identifier.of("blockyard-ui", "small");
     static final Identifier HEAD = Identifier.of("blockyard-ui", "head");
     static final Identifier TITLE = Identifier.of("blockyard-ui", "title");
 

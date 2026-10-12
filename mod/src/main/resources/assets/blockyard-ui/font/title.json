@@ -1,4 +1,4 @@
 {"providers": [
-  {"type": "ttf", "file": "blockyard-ui:unbounded_semibold.ttf", "size": 22.0, "oversample": 4.0, "shift": [0, 1]},
+  {"type": "ttf", "file": "blockyard-ui:unbounded_semibold.ttf", "size": 16.0, "oversample": 5.0, "shift": [0, 0.6]},
   {"type": "reference", "id": "minecraft:default"}
 ]}

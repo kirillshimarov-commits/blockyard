@@ -1,99 +1,82 @@
 package app.blockyard.ui.screen;
 
 import app.blockyard.ui.BlockyardUi;
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.ModContainer;
+import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
-import net.minecraft.client.gui.screen.option.OptionsScreen;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
 import net.minecraft.client.gui.screen.world.SelectWorldScreen;
 import net.minecraft.client.network.MultiplayerServerListPinger;
 import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
 import net.minecraft.client.option.ServerList;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.Util;
 import net.minecraft.world.level.storage.LevelStorage;
 import net.minecraft.world.level.storage.LevelSummary;
 import org.lwjgl.glfw.GLFW;
 
-import java.io.InputStream;
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
-/**
- * Console-style main menu. Everything is laid out on a virtual canvas 270 units tall, scaled to the
- * window, so it looks the same at any GUI scale; shapes are smooth textures and text uses TTF fonts.
- */
-public class HomeScreen extends Screen {
-    private static final float CANVAS_H = 270f;
-    private static final int TAB_SINGLE = 0, TAB_MULTI = 1;
-    private static final int WHITE = 0xFFFFFF, INK = 0x0B0A12;
-    private static final ExecutorService PINGER = Executors.newFixedThreadPool(4, r -> {
-        Thread t = new Thread(r, "Blockyard server pinger");
-        t.setDaemon(true);
-        return t;
-    });
+/** The main menu, laid out like the launcher's home: tabs, tiles, a large card and a shelf of cards. */
+public class HomeScreen extends BlockyardScreen {
+    static final int TAB_SINGLE = 0, TAB_MULTI = 1, TAB_PACKS = 2, TAB_MODS = 3;
 
-    // Remembered while the game runs, so coming back from a world keeps the place.
-    private static boolean introDone = false;
-    private static int tab = TAB_MULTI;
+    // Remembered while the game runs, so coming back keeps the place.
+    private static int tab = TAB_SINGLE;
     private static final int[] selected = {0, 0};
 
-    private final SpaceBackground background = new SpaceBackground();
     private final MultiplayerServerListPinger pinger = new MultiplayerServerListPinger();
-    private final List<Region> regions = new ArrayList<>();
-    private final Map<String, Identifier> icons = new HashMap<>();
-    private final Map<String, Object> iconSources = new HashMap<>();
     ServerList servers;
     private List<LevelSummary> worlds = null;
+    private List<ModContainer> mods = List.of();
+    private List<Path> screenshots = List.of();
+    private int screenshotCount = 0;
 
     private boolean menuOpen = false;
     private float menuX, menuY;
     private long changedAt = System.currentTimeMillis();
-    private long introLeaveAt = 0;
+    private float modsScroll = 0;
     private String flash = null;
     private long flashAt = 0;
-
-    // Virtual canvas.
-    private float k = 1, vw = 480;
-
-    private record Region(float x, float y, float w, float h, Runnable action, boolean menu) {
-        boolean contains(double mx, double my) {
-            return mx >= x && mx < x + w && my >= y && my < y + h;
-        }
-    }
 
     public HomeScreen() {
         super(Text.literal("Blockyard"));
     }
 
+    public HomeScreen(int tab) {
+        this();
+        if (tab == TAB_SINGLE || tab == TAB_MULTI || tab == TAB_MODS) HomeScreen.tab = tab;
+    }
+
     @Override
     protected void init() {
-        BlockyardUi.loadConfig();
+        super.init();
         servers = new ServerList(client);
         servers.loadFile();
         for (int i = 0; i < servers.size(); i++) ping(servers.get(i));
         loadWorlds();
+        mods = FabricLoader.getInstance().getAllMods().stream()
+                .filter(m -> !m.getMetadata().getType().equals("builtin") && m.getContainingMod().isEmpty())
+                .sorted(Comparator.comparing(m -> m.getMetadata().getName().toLowerCase(Locale.ROOT)))
+                .toList();
+        loadScreenshots();
     }
 
     private void loadWorlds() {
@@ -109,12 +92,26 @@ public class HomeScreen extends Screen {
         }
     }
 
+    private void loadScreenshots() {
+        Path dir = client.runDirectory.toPath().resolve("screenshots");
+        if (!Files.isDirectory(dir)) return;
+        try (Stream<Path> files = Files.list(dir)) {
+            List<Path> all = files.filter(p -> p.toString().endsWith(".png"))
+                    .sorted(Comparator.comparingLong((Path p) -> p.toFile().lastModified()).reversed())
+                    .toList();
+            screenshotCount = all.size();
+            screenshots = all.subList(0, Math.min(6, all.size()));
+        } catch (Exception ignored) {
+            // No screenshots card then.
+        }
+    }
+
     void ping(ServerInfo info) {
         if (info.getStatus() != ServerInfo.Status.INITIAL) return;
         info.setStatus(ServerInfo.Status.PINGING);
         info.label = Text.empty();
         info.playerCountLabel = Text.empty();
-        PINGER.submit(() -> {
+        Images.WORKER.submit(() -> {
             try {
                 pinger.add(info, () -> client.execute(servers::saveFile), () -> info.setStatus(ServerInfo.Status.SUCCESSFUL));
             } catch (Exception e) {
@@ -138,11 +135,6 @@ public class HomeScreen extends Screen {
         return false;
     }
 
-    @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Drawn in render().
-    }
-
     // ================================================================ entries
 
     private int count() {
@@ -152,8 +144,13 @@ public class HomeScreen extends Screen {
     private int current() {
         int n = count();
         if (n == 0) return -1;
-        selected[tab] = Math.max(0, Math.min(selected[tab], n - 1));
-        return selected[tab];
+        int t = tab == TAB_MULTI ? 1 : 0;
+        selected[t] = Math.max(0, Math.min(selected[t], n - 1));
+        return selected[t];
+    }
+
+    private int sel() {
+        return tab == TAB_MULTI ? 1 : 0;
     }
 
     private String nameOf(int i) {
@@ -165,45 +162,16 @@ public class HomeScreen extends Screen {
     private Identifier iconOf(int i) {
         if (tab == TAB_MULTI) {
             ServerInfo s = servers.get(i);
-            byte[] favicon = s.getFavicon();
-            if (favicon == null) return null;
-            String key = "s" + s.address;
-            if (iconSources.get(key) != favicon) {
-                iconSources.put(key, favicon);
-                try {
-                    register(key, NativeImage.read(favicon));
-                } catch (Exception e) {
-                    icons.remove(key);
-                }
-            }
-            return icons.get(key);
+            return Images.fromBytes("s" + s.address, s.getFavicon());
         }
         LevelSummary w = worlds.get(i);
-        String key = "w" + w.getName();
-        if (!iconSources.containsKey(key)) {
-            iconSources.put(key, Boolean.TRUE);
-            Path path = w.getIconPath();
-            if (path != null && Files.isRegularFile(path)) {
-                try (InputStream in = Files.newInputStream(path)) {
-                    register(key, NativeImage.read(in));
-                } catch (Exception ignored) {
-                    // No icon then.
-                }
-            }
-        }
-        return icons.get(key);
-    }
-
-    private void register(String key, NativeImage image) {
-        Identifier id = Identifier.of("blockyard-ui", "icons/" + Integer.toHexString(key.hashCode()));
-        NativeImageBackedTexture texture = new NativeImageBackedTexture(image);
-        texture.setFilter(true, false);
-        client.getTextureManager().registerTexture(id, texture);
-        icons.put(key, id);
+        return Images.fromFile("w" + w.getName(), w.getIconPath());
     }
 
     void play(int i) {
         click();
+        BlockyardUi.loadingTitle = nameOf(i);
+        BlockyardUi.loadingIcon = iconOf(i);
         if (tab == TAB_MULTI) {
             ServerInfo s = servers.get(i);
             ConnectScreen.connect(this, client, ServerAddress.parse(s.address), s, false, null);
@@ -218,22 +186,23 @@ public class HomeScreen extends Screen {
         else CreateWorldScreen.create(client, this);
     }
 
-    void click() {
-        client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-    }
-
     private void select(int i) {
-        if (selected[tab] == i) return;
-        selected[tab] = i;
+        if (selected[sel()] == i) return;
+        selected[sel()] = i;
         changedAt = System.currentTimeMillis();
         click();
     }
 
-    private void switchTab(int target) {
+    private void openTab(int target) {
         menuOpen = false;
+        modal = false;
+        if (target == TAB_PACKS) {
+            client.setScreen(new SettingsScreen(this, SettingsScreen.PACKS));
+            return;
+        }
         if (tab == target) return;
-        click();
         tab = target;
+        modsScroll = 0;
         changedAt = System.currentTimeMillis();
     }
 
@@ -244,206 +213,82 @@ public class HomeScreen extends Screen {
 
     // ================================================================ rendering
 
-    private static float ease(float t) {
-        t = Math.max(0, Math.min(1, t));
-        return 1 - (1 - t) * (1 - t) * (1 - t);
-    }
-
     @Override
-    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        regions.clear();
+    protected void draw(DrawContext ctx, float delta) {
         int accent = BlockyardUi.accent;
-        long now = System.currentTimeMillis();
-
-        float introFade = introDone ? 1 : 0;
-        if (introLeaveAt > 0) introFade = ease((now - introLeaveAt) / 450f);
-        background.render(ctx, width, height, accent, 1f);
-
-        k = height / CANVAS_H;
-        vw = width / k;
-        float mx = mouseX / k, my = mouseY / k;
-        MatrixStack m = ctx.getMatrices();
-        m.push();
-        m.scale(k, k, 1);
-
-        if (!introDone || introLeaveAt > 0 && introFade < 1) {
-            drawIntro(ctx, mx, my, accent, 1 - introFade);
-            if (introLeaveAt > 0 && introFade >= 1) {
-                introDone = true;
-                introLeaveAt = 0;
-            }
-        }
-        if (introDone || introLeaveAt > 0) {
-            float a = introDone && introLeaveAt == 0 ? 1 : introFade;
-            drawTopBar(ctx, mx, my, accent, a);
+        float a = ease((System.currentTimeMillis() - changedAt) / 380f);
+        drawTopBar(ctx, tab, false, 1, this::openTab);
+        if (tab == TAB_MODS) {
+            drawModsTab(ctx, accent);
+        } else {
             int idx = current();
-            float rowBottom = drawTiles(ctx, mx, my, idx, accent, a);
-            float appear = ease((now - changedAt) / 380f) * a;
-            if (idx >= 0) drawHero(ctx, mx, my, idx, rowBottom, accent, appear);
-            else drawEmpty(ctx, mx, my, rowBottom, accent, a);
-            if (menuOpen) drawMenu(ctx, mx, my);
-            if (flash != null && now - flashAt < 2600) {
-                float fa = Math.min(1, (2600 - (now - flashAt)) / 400f);
-                float w = Ui.width(textRenderer, flash, Ui.BODY) + 24;
-                Ui.round(ctx, (vw - w) / 2, CANVAS_H - 34, w, 18, 9, Ui.argb(0.9f * fa, 0x1A1828));
-                Ui.centered(ctx, textRenderer, flash, Ui.BODY, vw / 2, CANVAS_H - 28.5f, Ui.argb(fa, WHITE));
-            }
+            drawTiles(ctx, idx, accent);
+            if (idx >= 0) drawHero(ctx, idx, accent, a);
+            else drawEmpty(ctx, accent);
+            drawShelf(ctx, accent);
         }
-        m.pop();
-    }
-
-    private boolean hover(float mx, float my, float x, float y, float w, float h) {
-        return !menuOpen && mx >= x && mx < x + w && my >= y && my < y + h;
-    }
-
-    private void region(float x, float y, float w, float h, Runnable action) {
-        regions.add(new Region(x, y, w, h, action, false));
-    }
-
-    // ---------------------------------------------------------------- intro
-
-    private void drawIntro(DrawContext ctx, float mx, float my, int accent, float a) {
-        if (a <= 0.01f) return;
-        String clock = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")) + ", "
-                + capitalize(LocalDate.now().getDayOfWeek().getDisplayName(java.time.format.TextStyle.FULL, Locale.forLanguageTag("ru")));
-        Ui.text(ctx, textRenderer, clock, Ui.BODY, vw - 18 - Ui.width(textRenderer, clock, Ui.BODY), 14, Ui.argb(0.55f * a, WHITE));
-
-        float cy = CANVAS_H * 0.40f;
-        String hello = "Добро пожаловать в ";
-        String brand = "Blockyard";
-        float hw = Ui.width(textRenderer, hello, Ui.HEAD), bw = Ui.width(textRenderer, brand, Ui.HEAD);
-        float x = (vw - hw - bw) / 2;
-        Ui.text(ctx, textRenderer, hello, Ui.HEAD, x, cy, Ui.argb(0.92f * a, WHITE));
-        Ui.text(ctx, textRenderer, brand, Ui.HEAD, x + hw, cy, Ui.argb(a, Ui.mix(accent, WHITE, 0.45f)));
-        Ui.centered(ctx, textRenderer, "Во что сегодня играем?", Ui.BODY, vw / 2, cy + 17, Ui.argb(0.5f * a, WHITE));
-
-        String[] icons = {"gear", "cube", "globe"};
-        String[] labels = {"Настройки", "Одиночная игра", "Сетевая игра"};
-        float r = 17, gap = 58, oy = cy + 58;
-        float ox = vw / 2 - gap;
-        for (int i = 0; i < 3; i++) {
-            float cx = ox + i * gap;
-            boolean hov = mx >= cx - r && mx < cx + r && my >= oy - r && my < oy + r && introLeaveAt == 0;
-            float s = hov ? 1.12f : 1f;
-            if (hov) Ui.light(ctx, Ui.tex("glow"), cx - r * 2.6f, oy - r * 2.6f, r * 5.2f, r * 5.2f, Ui.argb(0.45f * a, accent));
-            Ui.circle(ctx, cx, oy, r * s + (hov ? 1.2f : 0), Ui.argb((hov ? 0.85f : 0) * a, WHITE));
-            Ui.circle(ctx, cx, oy, r * s, Ui.argb((hov ? 0.30f : 0.10f) * a, WHITE));
-            float is = 15 * s;
-            Ui.icon(ctx, icons[i], cx - is / 2, oy - is / 2, is, Ui.argb((hov ? 1f : 0.55f) * a, WHITE));
-            if (hov) Ui.centered(ctx, textRenderer, labels[i], Ui.BODY, cx, oy + r + 8, Ui.argb(a, WHITE));
-            final int which = i;
-            region(cx - r, oy - r, r * 2, r * 2, () -> {
-                if (introLeaveAt > 0) return;
-                click();
-                if (which == 0) {
-                    introDone = true;
-                    client.setScreen(new OptionsScreen(this, client.options));
-                    return;
-                }
-                tab = which == 1 ? TAB_SINGLE : TAB_MULTI;
-                introLeaveAt = System.currentTimeMillis();
-                changedAt = introLeaveAt + 200;
-            });
+        if (menuOpen) drawMenu(ctx);
+        long now = System.currentTimeMillis();
+        if (flash != null && now - flashAt < 2600) {
+            float fa = Math.min(1, (2600 - (now - flashAt)) / 400f);
+            float w = Ui.width(textRenderer, flash, Ui.BODY) + 16;
+            Ui.round(ctx, (vw - w) / 2, CANVAS_H - 22, w, 11, 5.5f, Ui.argb(0.92f * fa, 0x1A1828));
+            Ui.centered(ctx, textRenderer, flash, Ui.BODY, vw / 2, CANVAS_H - 19, Ui.argb(fa, WHITE));
         }
-        Ui.centered(ctx, textRenderer, "Blockyard · Minecraft 1.21.1", Ui.BODY, vw / 2, CANVAS_H - 16, Ui.argb(0.22f * a, WHITE));
-    }
-
-    private static String capitalize(String s) {
-        return s.isEmpty() ? s : s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1);
-    }
-
-    // ---------------------------------------------------------------- top bar
-
-    private void drawTopBar(DrawContext ctx, float mx, float my, int accent, float a) {
-        String[] labels = {"Одиночная игра", "Сетевая игра"};
-        float x = 16, y = 10, h = 15;
-        for (int i = 0; i < labels.length; i++) {
-            float w = Ui.width(textRenderer, labels[i], Ui.BODY) + 18;
-            boolean active = i == tab;
-            boolean hov = hover(mx, my, x, y, w, h);
-            if (active) {
-                Ui.light(ctx, Ui.tex("glow"), x - 6, y - 8, w + 12, h + 16, Ui.argb(0.18f * a, WHITE));
-                Ui.round(ctx, x, y, w, h, h / 2, Ui.argb(a, WHITE));
-            } else if (hov) {
-                Ui.round(ctx, x, y, w, h, h / 2, Ui.argb(0.10f * a, WHITE));
-            }
-            Ui.text(ctx, textRenderer, labels[i], Ui.BODY, x + 9, y + 4, Ui.argb(a * (active ? 1 : hov ? 0.95f : 0.72f), active ? INK : WHITE));
-            final int target = i;
-            region(x, y, w, h, () -> switchTab(target));
-            x += w + 6;
-        }
-
-        String clock = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-        float cw = Ui.width(textRenderer, clock, Ui.BOLD);
-        float rx = vw - 16 - cw;
-        Ui.text(ctx, textRenderer, clock, Ui.BOLD, rx, y + 4, Ui.argb(a, WHITE));
-        float ax = rx - 12 - 7;
-        Ui.circle(ctx, ax, y + h / 2, 7.5f, Ui.argb(a, Ui.mix(accent, WHITE, 0.08f)));
-        String name = client.getSession().getUsername();
-        String letter = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
-        Ui.centered(ctx, textRenderer, letter, Ui.BOLD, ax, y + 4, Ui.argb(a, WHITE));
-        float gx = ax - 12 - 18;
-        boolean hovGear = hover(mx, my, gx - 3, y - 2, 17, 19);
-        if (hovGear) Ui.circle(ctx, gx + 5.5f, y + h / 2, 9, Ui.argb(0.12f * a, WHITE));
-        Ui.icon(ctx, "gear", gx, y + 2, 11, Ui.argb((hovGear ? 1 : 0.85f) * a, WHITE));
-        region(gx - 3, y - 2, 17, 19, () -> {
-            click();
-            client.setScreen(new OptionsScreen(this, client.options));
-        });
     }
 
     // ---------------------------------------------------------------- tiles
 
-    private float drawTiles(DrawContext ctx, float mx, float my, int idx, int accent, float a) {
-        float base = 34, big = 46, gap = 8, left = 16;
-        float center = 60;
+    private void drawTiles(DrawContext ctx, int idx, int accent) {
+        float action = 16, base = 21, big = 30, gap = 4, left = 10, center = 45;
         int n = count();
-        float selX = left + (base + gap) * (idx + 1);
-        float scroll = Math.max(0, selX + big + 24 - vw);
+        float selX = left + action + gap + (base + gap) * Math.max(0, idx);
+        float scroll = Math.max(0, selX + big + 30 - vw);
         float x = left - scroll;
 
-        // "+" tile.
-        boolean hovAdd = hover(mx, my, x, center - base / 2, base, base);
-        Ui.round(ctx, x, center - base / 2, base, base, 9, Ui.argb((hovAdd ? 0.16f : 0.07f) * a, WHITE));
-        Ui.icon(ctx, "plus", x + base / 2 - 6, center - 6, 12, Ui.argb((hovAdd ? 0.9f : 0.5f) * a, WHITE));
-        region(x, center - base / 2, base, base, this::add);
-        x += base + gap;
+        // First tile: which kind of list this is.
+        Ui.round(ctx, x, center - action / 2, action, action, 4.5f, 0x14FFFFFF);
+        Ui.icon(ctx, tab == TAB_MULTI ? "globe" : "cube", x + 4, center - 4, 8, 0xE6FFFFFF);
+        x += action + gap;
 
         long now = System.currentTimeMillis();
         for (int i = 0; i < n; i++) {
-            boolean sel = i == idx;
-            float size = sel ? big : base;
+            boolean s = i == idx;
+            float size = s ? big : base;
             float ty = center - size / 2;
-            boolean hov = hover(mx, my, x, ty, size, size);
-            if (hov && !sel) ty -= 2;
-            float r = sel ? 11 : 9;
-            if (sel) {
+            boolean hov = hover(x, ty, size, size);
+            if (hov && !s) ty -= 1;
+            float r = s ? 6.5f : 5;
+            if (s) {
                 float pulse = 0.85f + 0.15f * (float) Math.sin(now / 600.0);
-                Ui.light(ctx, Ui.tex("glow"), x - size * 0.6f, ty - size * 0.5f, size * 2.2f, size * 2.2f, Ui.argb(0.42f * a * pulse, accent));
-                Ui.shadow(ctx, x, ty + 4, size, size, 10, 0.6f * a);
-                Ui.round(ctx, x - 2.5f, ty - 2.5f, size + 5, size + 5, r + 2.5f, Ui.argb(a, WHITE));
-            } else {
-                Ui.shadow(ctx, x, ty + 2, size, size, 6, 0.35f * a);
+                Ui.light(ctx, Ui.tex("glow"), x - size * 0.6f, ty - size * 0.45f, size * 2.2f, size * 2.2f, Ui.argb(0.4f * pulse, accent));
+                Ui.shadow(ctx, x, ty + 3, size, size, 7, 0.55f);
+                Ui.round(ctx, x - 2.25f, ty - 2.25f, size + 4.5f, size + 4.5f, r + 2.25f, 0x1FFFFFFF);
+                Ui.round(ctx, x - 1, ty - 1, size + 2, size + 2, r + 1, 0xFFFFFFFF);
             }
-            drawArt(ctx, i, x, ty, size, r, accent, a * (sel || hov ? 1 : 0.62f));
+            drawArt(ctx, i, x, ty, size, r, accent, s || hov ? 1 : 0.78f);
             final int target = i;
             region(x, ty, size, size, () -> {
-                if (selected[tab] == target) play(target);
+                if (selected[sel()] == target) play(target);
                 else select(target);
             });
             x += size + gap;
         }
+        // "+" tile at the end.
+        boolean hovAdd = hover(x, center - action / 2, action, action);
+        Ui.round(ctx, x, center - action / 2, action, action, 4.5f, hovAdd ? 0x24FFFFFF : 0x0AFFFFFF);
+        Ui.icon(ctx, "plus", x + 4.5f, center - 3.5f, 7, hovAdd ? 0xFFFFFFFF : 0xB0FFFFFF);
+        region(x, center - action / 2, action, action, this::add);
 
-        float captionY = center + big / 2 + 9;
         if (idx >= 0) {
-            float cx = left + base + gap - scroll;
+            float cx = left + action + gap - scroll;
+            float cy = 65.5f;
             String tag = tab == TAB_MULTI ? "сервер" : "мир";
-            float tw = Ui.width(textRenderer, tag, Ui.BOLD) + 10;
-            Ui.round(ctx, cx, captionY, tw, 11, 5.5f, Ui.argb(a, WHITE));
-            Ui.text(ctx, textRenderer, tag, Ui.BOLD, cx + 5, captionY + 2, Ui.argb(a, INK));
-            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, nameOf(idx), Ui.BODY, vw * 0.5f), Ui.BODY, cx + tw + 6, captionY + 2, Ui.argb(a, WHITE));
+            float tw = Ui.width(textRenderer, tag, Ui.BOLD) + 5;
+            Ui.round(ctx, cx, cy, tw, 6.5f, 3.25f, 0xFFFFFFFF);
+            Ui.text(ctx, textRenderer, tag, Ui.SMALL, cx + 2.6f, cy + 1.6f, Ui.argb(1, INK));
+            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, nameOf(idx), Ui.BODY, vw * 0.4f), Ui.BODY, cx + tw + 2.5f, cy + 1.1f, 0xFFFFFFFF);
         }
-        return captionY + 16;
     }
 
     /** The picture of an entry: its icon, or its first letter on an accent gradient. */
@@ -451,8 +296,7 @@ public class HomeScreen extends Screen {
         Identifier icon = iconOf(i);
         if (icon != null) {
             Ui.round(ctx, x, y, size, size, r, Ui.argb(a, 0x16141F));
-            // Icons are square; inset a little so the rounded frame shows around them.
-            float inset = size * 0.08f;
+            float inset = size * 0.06f;
             Ui.image(ctx, icon, x + inset, y + inset, size - inset * 2, size - inset * 2, Ui.argb(a, WHITE));
         } else {
             Ui.round(ctx, x, y, size, size, r, Ui.argb(a, Ui.mix(accent, WHITE, 0.15f)), Ui.argb(a, Ui.mix(accent, 0x000000, 0.35f)));
@@ -460,8 +304,8 @@ public class HomeScreen extends Screen {
             String letter = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
             MatrixStack m = ctx.getMatrices();
             m.push();
-            float scale = size / 60f;
-            m.translate(x + size / 2, y + size / 2 - 11 * scale, 0);
+            float scale = size / 32f;
+            m.translate(x + size / 2, y + size / 2 - 8.5f * scale, 0);
             m.scale(scale, scale, 1);
             Ui.centered(ctx, textRenderer, letter, Ui.TITLE, 0, 0, Ui.argb(a, WHITE));
             m.pop();
@@ -470,117 +314,265 @@ public class HomeScreen extends Screen {
 
     // ---------------------------------------------------------------- hero
 
-    private void drawHero(DrawContext ctx, float mx, float my, int idx, float top, int accent, float a) {
-        float lift = (1 - a) * 10;
-        float art = Math.min(118, Math.min(vw * 0.25f, CANVAS_H - top - 40));
-        float artX = vw - art - 26, artY = top + (CANVAS_H - top - art) / 2 - 8 + lift * 0.5f;
-        float left = 26;
-        float maxText = artX - left - 24;
+    private void drawHero(DrawContext ctx, int idx, int accent, float a) {
+        float lift = (1 - a) * 6;
+        float art = Math.min(80, vw * 0.2f);
+        float artX = vw - art - 17.5f, artY = 75 - lift * 0.4f;
+        float left = 17.5f, maxText = artX - left - 20;
 
-        // Big art with glow on the right.
-        Ui.light(ctx, Ui.tex("glow"), artX - art * 0.5f, artY - art * 0.45f, art * 2, art * 2, Ui.argb(0.35f * a, accent));
-        Ui.shadow(ctx, artX, artY + 8, art, art, 22, 0.75f * a);
-        drawArt(ctx, idx, artX, artY, art, 18, accent, a);
+        Ui.light(ctx, Ui.tex("glow"), artX - art * 0.55f, artY - art * 0.5f, art * 2.1f, art * 2.1f, Ui.argb(0.35f * a, accent));
+        Ui.shadow(ctx, artX, artY + 6, art, art, 16, 0.7f * a);
+        drawArt(ctx, idx, artX, artY, art, 8.5f, accent, a);
 
-        float y = top + Math.max(6, (CANVAS_H - top - 120) / 2) + lift;
+        float y = 81 + lift;
         Ui.text(ctx, textRenderer, Ui.fit(textRenderer, nameOf(idx), Ui.TITLE, maxText), Ui.TITLE, left, y, Ui.argb(a, WHITE));
-        y += 30;
+        y += 22;
 
-        String detail, status, motd = null;
-        int dot;
+        String detail;
+        List<String> chips = new ArrayList<>();
+        int dot = 0x9AA0B0;
+        String motd = null;
         if (tab == TAB_MULTI) {
             ServerInfo s = servers.get(idx);
             detail = "IP: " + s.address;
             switch (s.getStatus()) {
                 case SUCCESSFUL -> {
-                    status = s.playerCountLabel.getString() + " игроков  ·  " + s.ping + " мс";
+                    chips.add("Онлайн: " + s.playerCountLabel.getString());
+                    chips.add(s.ping + " мс");
                     dot = 0x3EE08F;
                 }
                 case INCOMPATIBLE -> {
-                    status = "Другая версия: " + s.version.getString();
+                    chips.add("Версия сервера: " + s.version.getString());
                     dot = 0xF2B84B;
                 }
                 case UNREACHABLE -> {
-                    status = "Сервер недоступен";
+                    chips.add("Сервер недоступен");
                     dot = 0xEF5B5B;
                 }
-                default -> {
-                    status = "Опрашиваем сервер…";
-                    dot = 0x9AA0B0;
-                }
+                default -> chips.add("Опрашиваем сервер…");
             }
             if (s.label != null && !s.label.getString().isBlank()) motd = s.label.getString().replace('\n', ' ').trim();
         } else {
             LevelSummary w = worlds.get(idx);
             detail = w.getDetails().getString();
             long last = w.getLastPlayed();
-            if (last <= 0) status = "Ещё не запускался";
+            if (last <= 0) chips.add("Ещё не запускался");
             else {
                 LocalDate d = Instant.ofEpochMilli(last).atZone(ZoneId.systemDefault()).toLocalDate();
                 LocalDate today = LocalDate.now();
-                status = d.equals(today) ? "Играли сегодня"
-                        : d.equals(today.minusDays(1)) ? "Играли вчера"
-                        : "Играли " + d.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru")));
+                chips.add(d.equals(today) ? "Играли сегодня" : d.equals(today.minusDays(1)) ? "Играли вчера"
+                        : "Играли " + d.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))));
             }
-            dot = 0x9AA0B0;
+            if (w.isHardcore()) chips.add("Хардкор");
+            if (w.hasCheats()) chips.add("Читы");
         }
-        Ui.text(ctx, textRenderer, Ui.fit(textRenderer, detail, Ui.BODY, maxText), Ui.BODY, left, y, Ui.argb(0.55f * a, WHITE));
-        y += 14;
+        Ui.text(ctx, textRenderer, Ui.fit(textRenderer, detail, Ui.BODY, maxText), Ui.BODY, left, y, Ui.argb(0.62f * a, WHITE));
+        y += 7.5f;
 
-        String chip = Ui.fit(textRenderer, status, Ui.BODY, maxText - 24);
-        float chipW = Ui.width(textRenderer, chip, Ui.BODY) + 24;
-        Ui.round(ctx, left, y, chipW, 15, 5, Ui.argb(0.10f * a, WHITE));
-        Ui.light(ctx, Ui.tex("glow"), left + 3, y + 1.5f, 12, 12, Ui.argb(0.8f * a, dot));
-        Ui.circle(ctx, left + 9, y + 7.5f, 2.2f, Ui.argb(a, dot));
-        Ui.text(ctx, textRenderer, chip, Ui.BODY, left + 16, y + 4, Ui.argb(a, WHITE));
+        float cx = left;
+        for (int c = 0; c < chips.size(); c++) {
+            String chip = chips.get(c);
+            boolean withDot = c == 0;
+            float w = Ui.width(textRenderer, chip, Ui.BODY) + (withDot ? 12 : 8);
+            Ui.round(ctx, cx, y, w, 9, 3, Ui.argb(0.08f * a, WHITE));
+            float tx = cx + 4;
+            if (withDot) {
+                Ui.light(ctx, Ui.tex("glow"), cx + 2, y + 1.5f, 6, 6, Ui.argb(0.7f * a, dot));
+                Ui.circle(ctx, cx + 5, y + 4.5f, 1.15f, Ui.argb(a, dot));
+                tx = cx + 8;
+            }
+            Ui.text(ctx, textRenderer, chip, Ui.BODY, tx, y + 2.3f, Ui.argb(a, WHITE));
+            cx += w + 2.5f;
+        }
         if (motd != null) {
-            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, motd, Ui.BODY, maxText), Ui.BODY, left, y + 21, Ui.argb(0.45f * a, WHITE));
+            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, motd, Ui.BODY, maxText), Ui.BODY, left, y + 12, Ui.argb(0.45f * a, WHITE));
         }
 
-        // Buttons pinned near the bottom, like on a console.
-        float by = CANVAS_H - 44 + lift;
+        float by = 126 + lift, ph = 15.5f;
         String label = "Играть";
-        float pw = Ui.width(textRenderer, label, Ui.BOLD) + 40, ph = 21;
-        boolean hovPlay = hover(mx, my, left, by, pw, ph);
-        float grow = hovPlay ? 1.5f : 0;
-        if (hovPlay) Ui.light(ctx, Ui.tex("glow"), left - 20, by - 18, pw + 40, ph + 36, Ui.argb(0.55f * a, accent));
-        Ui.shadow(ctx, left, by + 3, pw, ph, 8, 0.5f * a);
+        float pw = Ui.width(textRenderer, label, Ui.BOLD) * 1.2f + 26;
+        boolean hovPlay = hover(left, by, pw, ph);
+        if (hovPlay) Ui.light(ctx, Ui.tex("glow"), left - 14, by - 12, pw + 28, ph + 24, Ui.argb(0.5f * a, accent));
+        Ui.shadow(ctx, left, by + 2.5f, pw, ph, 7, 0.45f * a);
+        float grow = hovPlay ? 0.8f : 0;
         Ui.round(ctx, left - grow, by - grow, pw + grow * 2, ph + grow * 2, ph / 2 + grow, Ui.argb(a, WHITE));
-        Ui.text(ctx, textRenderer, label, Ui.BOLD, left + 14, by + 6.5f, Ui.argb(a, INK));
-        Ui.icon(ctx, "play", left + pw - 21, by + 6, 9, Ui.argb(a, INK));
+        MatrixStack m = ctx.getMatrices();
+        m.push();
+        m.translate(left + 10, by + 5.2f, 0);
+        m.scale(1.2f, 1.2f, 1);
+        Ui.text(ctx, textRenderer, label, Ui.BOLD, 0, 0, Ui.argb(a, INK));
+        m.pop();
+        Ui.icon(ctx, "play", left + pw - 12, by + 5.5f, 4.5f, Ui.argb(a, INK));
         region(left, by, pw, ph, () -> play(idx));
 
-        float dx = left + pw + 9, dr = ph / 2;
-        boolean hovMore = hover(mx, my, dx, by, ph, ph);
-        Ui.circle(ctx, dx + dr, by + dr, dr, Ui.argb((hovMore ? 0.22f : 0.11f) * a, WHITE));
-        for (int d = -1; d <= 1; d++) Ui.circle(ctx, dx + dr + d * 3.6f, by + dr, 1.15f, Ui.argb(a, WHITE));
+        float dx = left + pw + 3.5f, dr = ph / 2;
+        boolean hovMore = hover(dx, by, ph, ph);
+        Ui.circle(ctx, dx + dr, by + dr, dr, Ui.argb((hovMore ? 0.2f : 0.1f) * a, WHITE));
+        for (int d = -1; d <= 1; d++) Ui.circle(ctx, dx + dr + d * 2.4f, by + dr, 0.75f, Ui.argb(a, WHITE));
         region(dx, by, ph, ph, () -> {
             click();
             menuOpen = true;
+            modal = true;
             menuX = dx;
             menuY = by;
         });
     }
 
-    private void drawEmpty(DrawContext ctx, float mx, float my, float top, int accent, float a) {
-        float cy = top + (CANVAS_H - top) / 2 - 26;
+    private void drawEmpty(DrawContext ctx, int accent) {
+        float cy = 100;
         boolean loading = tab == TAB_SINGLE && worlds == null;
         String title = tab == TAB_MULTI ? "Серверов пока нет" : loading ? "Загружаем миры…" : "Миров пока нет";
-        Ui.centered(ctx, textRenderer, title, Ui.HEAD, vw / 2, cy, Ui.argb(a, WHITE));
+        Ui.text(ctx, textRenderer, title, Ui.HEAD, 17.5f, cy, 0xFFFFFFFF);
         if (loading) return;
-        Ui.centered(ctx, textRenderer, tab == TAB_MULTI ? "Добавьте сервер по IP-адресу" : "Создайте свой первый мир", Ui.BODY, vw / 2, cy + 16, Ui.argb(0.5f * a, WHITE));
-        String label = tab == TAB_MULTI ? "Добавить сервер" : "Создать мир";
-        float bw = Ui.width(textRenderer, label, Ui.BOLD) + 30, bh = 21, bx = (vw - bw) / 2, by = cy + 34;
-        boolean hov = hover(mx, my, bx, by, bw, bh);
-        if (hov) Ui.light(ctx, Ui.tex("glow"), bx - 20, by - 18, bw + 40, bh + 36, Ui.argb(0.5f * a, accent));
-        Ui.round(ctx, bx, by, bw, bh, bh / 2, Ui.argb(a, WHITE));
-        Ui.centered(ctx, textRenderer, label, Ui.BOLD, vw / 2, by + 6.5f, Ui.argb(a, INK));
-        region(bx, by, bw, bh, this::add);
+        Ui.text(ctx, textRenderer, tab == TAB_MULTI ? "Добавьте сервер по IP-адресу" : "Создайте свой первый мир",
+                Ui.BODY, 17.5f, cy + 11, Ui.argb(0.55f, WHITE));
+        pillButton(ctx, tab == TAB_MULTI ? "Добавить сервер" : "Создать мир", 17.5f, cy + 22, 13, true, 1, this::add);
+    }
+
+    // ---------------------------------------------------------------- shelf
+
+    private void drawShelf(DrawContext ctx, int accent) {
+        float left = 17.5f, gap = 5, top = 176.5f, h = CANVAS_H - 12.5f - top;
+        float w = (vw - left * 2 - gap * 2) / 3;
+        for (int c = 0; c < 3; c++) {
+            float x = left + c * (w + gap);
+            panel(ctx, x, top, w, h, 6, 1);
+            switch (c) {
+                case 0 -> drawModsCard(ctx, x, top, w, h, accent);
+                case 1 -> drawScreenshotsCard(ctx, x, top, w, h);
+                default -> drawFriendCard(ctx, x, top, w, h);
+            }
+        }
+    }
+
+    private void cardHeader(DrawContext ctx, String title, String right, float x, float y, float w) {
+        Ui.text(ctx, textRenderer, title, Ui.BOLD, x + 5.5f, y + 5.5f, 0xFFFFFFFF);
+        if (right != null) {
+            Ui.text(ctx, textRenderer, right, Ui.BODY, x + w - 5.5f - Ui.width(textRenderer, right, Ui.BODY), y + 5.5f, Ui.argb(0.6f, WHITE));
+        }
+    }
+
+    private void cardLink(DrawContext ctx, String label, float x, float y, Runnable action) {
+        float w = Ui.width(textRenderer, label, Ui.SMALL) + 4;
+        boolean hov = hover(x, y - 1, w, 6);
+        Ui.text(ctx, textRenderer, label, Ui.SMALL, x, y, Ui.argb(hov ? 1 : 0.6f, WHITE));
+        region(x, y - 1, w, 6, () -> {
+            click();
+            action.run();
+        });
+    }
+
+    private void drawModsCard(DrawContext ctx, float x, float y, float w, float h, int accent) {
+        cardHeader(ctx, "Моды в сборке", String.valueOf(mods.size()), x, y, w);
+        float ry = y + 15;
+        int shown = Math.min(4, mods.size());
+        for (int i = 0; i < shown; i++) {
+            ModMetadata meta = mods.get(i).getMetadata();
+            modIcon(ctx, mods.get(i), x + 5.5f, ry, 9.5f, accent);
+            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, meta.getName(), Ui.BODY, w - 45), Ui.BODY, x + 18.5f, ry + 2.8f, 0xFFFFFFFF);
+            String v = Ui.fit(textRenderer, meta.getVersion().getFriendlyString(), Ui.SMALL, 24);
+            Ui.text(ctx, textRenderer, v, Ui.SMALL, x + w - 5.5f - Ui.width(textRenderer, v, Ui.SMALL), ry + 3.3f, Ui.argb(0.55f, WHITE));
+            ry += 12.5f;
+        }
+        if (mods.isEmpty()) Ui.text(ctx, textRenderer, "Модов нет", Ui.BODY, x + 5.5f, ry + 2, Ui.argb(0.55f, WHITE));
+        cardLink(ctx, "Все моды ›", x + 5.5f, y + h - 8, () -> openTab(TAB_MODS));
+    }
+
+    private void modIcon(DrawContext ctx, ModContainer mod, float x, float y, float size, int accent) {
+        Identifier icon = null;
+        String path = mod.getMetadata().getIconPath(64).orElse(null);
+        if (path != null) icon = Images.fromFile("m" + mod.getMetadata().getId(), mod.findPath(path).orElse(null));
+        if (icon != null) {
+            Ui.round(ctx, x, y, size, size, 2.6f, 0xFF1A1826);
+            Ui.image(ctx, icon, x, y, size, size, 0xFFFFFFFF);
+        } else {
+            int c = Ui.mix(accent, (mod.getMetadata().getId().hashCode() & 0xFFFFFF) | 0x404040, 0.45f);
+            Ui.round(ctx, x, y, size, size, 2.6f, Ui.argb(1, c));
+            Ui.centered(ctx, textRenderer, mod.getMetadata().getName().substring(0, 1).toUpperCase(Locale.ROOT), Ui.BOLD, x + size / 2, y + size / 2 - 2.2f, 0xFFFFFFFF);
+        }
+    }
+
+    private void drawScreenshotsCard(DrawContext ctx, float x, float y, float w, float h) {
+        cardHeader(ctx, "Скриншоты", String.valueOf(screenshotCount), x, y, w);
+        float gx = x + 5.5f, gy = y + 14, gap = 2;
+        float tw = (w - 11 - gap * 2) / 3, th = tw * 10 / 16;
+        if (screenshots.isEmpty()) {
+            Ui.text(ctx, textRenderer, "Пока пусто: нажмите F2 в игре", Ui.BODY, gx, gy + 4, Ui.argb(0.55f, WHITE));
+        }
+        for (int i = 0; i < screenshots.size(); i++) {
+            float tx = gx + (i % 3) * (tw + gap), ty = gy + (i / 3) * (th + gap);
+            Path p = screenshots.get(i);
+            Identifier thumb = Images.thumbnail("shot" + p, p, 192, 120);
+            Ui.round(ctx, tx, ty, tw, th, 2.5f, 0x14FFFFFF);
+            if (thumb != null) Ui.image(ctx, thumb, tx, ty, tw, th, 0xFFFFFFFF);
+        }
+        cardLink(ctx, "Открыть папку ›", x + 5.5f, y + h - 8, () -> {
+            File dir = client.runDirectory.toPath().resolve("screenshots").toFile();
+            dir.mkdirs();
+            Util.getOperatingSystem().open(dir);
+        });
+    }
+
+    private void drawFriendCard(DrawContext ctx, float x, float y, float w, float h) {
+        cardHeader(ctx, "Игра с другом", "Blockyard", x, y, w);
+        Ui.text(ctx, textRenderer, "Открой мир для друга", Ui.HEAD, x + 5.5f, y + 15, 0xFFFFFFFF);
+        String[] lines = {"Зайди в мир, нажми Esc и «Пригласить друга».", "Код появится прямо в меню паузы — без Hamachi."};
+        for (int i = 0; i < lines.length; i++) {
+            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, lines[i], Ui.SMALL, w - 11), Ui.SMALL, x + 5.5f, y + 26 + i * 5.5f, Ui.argb(0.6f, WHITE));
+        }
+        if (tab == TAB_SINGLE && current() >= 0) {
+            pillButton(ctx, "Играть и пригласить", x + 5.5f, y + h - 16.5f, 11.5f, true, 1, () -> {
+                BlockyardUi.inviteOnJoin = true;
+                play(current());
+            });
+        }
+    }
+
+    // ---------------------------------------------------------------- mods tab
+
+    private void drawModsTab(DrawContext ctx, int accent) {
+        float left = 17.5f, top = 34, cols = vw > 380 ? 3 : 2, gap = 5;
+        Ui.text(ctx, textRenderer, "Моды", Ui.TITLE, left, top, 0xFFFFFFFF);
+        Ui.text(ctx, textRenderer, mods.size() + " установлено в этой сборке · добавляйте и удаляйте моды в лаунчере",
+                Ui.BODY, left, top + 21, Ui.argb(0.6f, WHITE));
+        float w = (vw - left * 2 - gap * (cols - 1)) / cols, h = 26;
+        float listTop = top + 32, listH = CANVAS_H - listTop - 8;
+        float maxScroll = Math.max(0, (float) Math.ceil(mods.size() / cols) * (h + gap) - listH);
+        modsScroll = Math.max(0, Math.min(modsScroll, maxScroll));
+        ctx.enableScissor((int) 0, (int) (listTop * k), width, (int) ((listTop + listH) * k));
+        for (int i = 0; i < mods.size(); i++) {
+            float x = left + (i % (int) cols) * (w + gap);
+            float y = listTop + (i / (int) cols) * (h + gap) - modsScroll;
+            if (y + h < listTop || y > listTop + listH) continue;
+            ModMetadata meta = mods.get(i).getMetadata();
+            Ui.round(ctx, x, y, w, h, 5, hover(x, y, w, h) ? 0x1AFFFFFF : 0x10FFFFFF);
+            modIcon(ctx, mods.get(i), x + 4.5f, y + 4.5f, 17, accent);
+            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, meta.getName(), Ui.BOLD, w - 50), Ui.BOLD, x + 26, y + 5, 0xFFFFFFFF);
+            String v = Ui.fit(textRenderer, meta.getVersion().getFriendlyString(), Ui.SMALL, 26);
+            Ui.text(ctx, textRenderer, v, Ui.SMALL, x + w - 4.5f - Ui.width(textRenderer, v, Ui.SMALL), y + 5.6f, Ui.argb(0.5f, WHITE));
+            String desc = meta.getDescription().replace('\n', ' ');
+            Ui.text(ctx, textRenderer, Ui.fit(textRenderer, desc.isBlank() ? meta.getId() : desc, Ui.SMALL, w - 32), Ui.SMALL, x + 26, y + 14.5f, Ui.argb(0.55f, WHITE));
+        }
+        ctx.disableScissor();
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (tab == TAB_MODS) {
+            modsScroll -= (float) verticalAmount * 18;
+            return true;
+        }
+        if (verticalAmount != 0 && count() > 0) {
+            int next = selected[sel()] + (verticalAmount < 0 ? 1 : -1);
+            if (next >= 0 && next < count()) select(next);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     // ---------------------------------------------------------------- menu
 
-    private void drawMenu(DrawContext ctx, float mx, float my) {
+    private void drawMenu(DrawContext ctx) {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         int idx = current();
@@ -605,7 +597,7 @@ public class HomeScreen extends Screen {
             labels.add("Добавить сервер");
             actions.add(this::add);
         } else {
-            labels.add("Все миры");
+            labels.add("Управление мирами");
             actions.add(() -> client.setScreen(new SelectWorldScreen(this)));
             labels.add("Создать мир");
             actions.add(this::add);
@@ -620,81 +612,61 @@ public class HomeScreen extends Screen {
 
         float w = 0;
         for (String l : labels) w = Math.max(w, Ui.width(textRenderer, l, Ui.BODY));
-        w += 26;
-        float rowH = 15, h = labels.size() * rowH + 8;
-        float x = menuX, y = Math.max(6, menuY - h - 6);
+        w += 16;
+        float rowH = 10, h = labels.size() * rowH + 5;
+        float x = menuX, y = Math.max(4, menuY - h - 4);
         MatrixStack m = ctx.getMatrices();
         m.push();
         m.translate(0, 0, 300);
-        Ui.shadow(ctx, x, y + 4, w, h, 14, 0.7f);
-        Ui.round(ctx, x, y, w, h, 9, 0xF21A1828);
+        Ui.shadow(ctx, x, y + 3, w, h, 10, 0.7f);
+        Ui.round(ctx, x, y, w, h, 5.5f, 0xF41A1828);
         for (int i = 0; i < labels.size(); i++) {
-            float ry = y + 4 + i * rowH;
-            boolean hov = mx >= x && mx < x + w && my >= ry && my < ry + rowH;
-            if (hov) Ui.round(ctx, x + 3, ry, w - 6, rowH, 6, 0x22FFFFFF);
+            float ry = y + 2.5f + i * rowH;
+            boolean hov = hoverAny(x, ry, w, rowH);
+            if (hov) Ui.round(ctx, x + 2, ry, w - 4, rowH, 3.5f, 0x22FFFFFF);
             boolean danger = labels.get(i).startsWith("Удалить") || labels.get(i).startsWith("Выйти");
-            Ui.text(ctx, textRenderer, labels.get(i), Ui.BODY, x + 13, ry + 4, danger ? 0xFFFF8A8A : 0xFFFFFFFF);
+            Ui.text(ctx, textRenderer, labels.get(i), Ui.BODY, x + 8, ry + 2.9f, danger ? 0xFFFF8A8A : 0xFFFFFFFF);
             final Runnable action = actions.get(i);
-            regions.add(new Region(x, ry, w, rowH, () -> {
+            popupRegion(x, ry, w, rowH, () -> {
                 click();
-                menuOpen = false;
+                closePopup();
                 action.run();
-            }, true));
+            });
         }
         m.pop();
     }
 
-    // ================================================================ input
-
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
-        double mx = mouseX / k, my = mouseY / k;
-        // Later regions are drawn on top (the menu), so check them first.
-        for (int i = regions.size() - 1; i >= 0; i--) {
-            Region r = regions.get(i);
-            if (menuOpen && !r.menu()) continue;
-            if (r.contains(mx, my)) {
-                r.action().run();
-                return true;
-            }
-        }
-        if (menuOpen) {
-            menuOpen = false;
-            return true;
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
+    protected void closePopup() {
+        super.closePopup();
+        menuOpen = false;
     }
+
+    // ================================================================ keys
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (menuOpen && keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            menuOpen = false;
+        if (modal && keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            closePopup();
             return true;
-        }
-        if (!introDone) {
-            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
-                introLeaveAt = System.currentTimeMillis();
-                return true;
-            }
-            return super.keyPressed(keyCode, scanCode, modifiers);
         }
         int n = count();
         switch (keyCode) {
             case GLFW.GLFW_KEY_RIGHT -> {
-                if (n > 0 && selected[tab] < n - 1) select(selected[tab] + 1);
+                if (tab != TAB_MODS && n > 0 && selected[sel()] < n - 1) select(selected[sel()] + 1);
                 return true;
             }
             case GLFW.GLFW_KEY_LEFT -> {
-                if (selected[tab] > 0) select(selected[tab] - 1);
+                if (tab != TAB_MODS && selected[sel()] > 0) select(selected[sel()] - 1);
                 return true;
             }
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
-                if (current() >= 0) play(current());
+                if (tab != TAB_MODS && current() >= 0) play(current());
                 return true;
             }
             case GLFW.GLFW_KEY_TAB -> {
-                switchTab(tab == TAB_MULTI ? TAB_SINGLE : TAB_MULTI);
+                click();
+                openTab(tab == TAB_SINGLE ? TAB_MULTI : tab == TAB_MULTI ? TAB_MODS : TAB_SINGLE);
                 return true;
             }
             default -> {

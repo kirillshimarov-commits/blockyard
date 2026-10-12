@@ -254,7 +254,7 @@ async fn run_game(
             .map_err(|e| anyhow::anyhow!("Команда перед запуском не выполнилась: {e:#}"))?;
     }
     let launcher_settings = settings::load();
-    if let Err(e) = launcher::gameui::sync(&prepared.game_dir, inst, launcher_settings.game_ui) {
+    if let Err(e) = launcher::gameui::sync(&prepared.game_dir, inst, launcher_settings.game_ui).await {
         eprintln!("Blockyard UI mod: {e:#}");
     }
     let started = std::time::SystemTime::now();
@@ -274,6 +274,10 @@ async fn run_game(
         });
     }
 
+    // Where the friend invite code is left for the game to show.
+    let invite_file = prepared.game_dir.join("blockyard").join("invite.txt");
+    let _ = std::fs::remove_file(&invite_file);
+
     // The last lines of output, for crash analysis when there is no crash report.
     let log_tail: Arc<Mutex<std::collections::VecDeque<String>>> = Arc::default();
     for stream in [child.stdout.take().map(|s| Box::new(s) as Box<dyn tokio::io::AsyncRead + Unpin + Send>),
@@ -284,12 +288,24 @@ async fn run_game(
         let app = app.clone();
         let instance_id = inst.id.clone();
         let tail = log_tail.clone();
+        let invite_file = invite_file.clone();
         tauri::async_runtime::spawn(async move {
             let mut lines = BufReader::new(stream).lines();
             while let Ok(Some(line)) = lines.next_line().await {
                 if let Some(port) = tunnel::parse_lan_port(&line) {
                     app.state::<Tunnels>().lan_ports.lock().unwrap().insert(instance_id.clone(), port);
                     let _ = app.emit("lan-opened", LanEvent { instance_id: instance_id.clone(), port });
+                    // The game covers the launcher, so hand the invite code to the game itself:
+                    // Blockyard UI shows it in the pause menu.
+                    let (app, instance_id, file) = (app.clone(), instance_id.clone(), invite_file.clone());
+                    tauri::async_runtime::spawn(async move {
+                        if let Ok(code) = create_invite(&instance_id, &app.state::<Tunnels>()).await {
+                            if let Some(dir) = file.parent() {
+                                let _ = std::fs::create_dir_all(dir);
+                            }
+                            let _ = std::fs::write(&file, code);
+                        }
+                    });
                 }
                 {
                     let mut t = tail.lock().unwrap();
@@ -320,6 +336,7 @@ async fn run_game(
         }
     }
     Ok(()) }.await;
+    let _ = std::fs::remove_file(&invite_file);
     if !post_exit.is_empty() {
         if let Err(e) = launch::run_hook(&post_exit, &game_dir).await {
             let _ = app.emit("game-log", LogEvent { instance_id: inst.id.clone(), line: format!("[Blockyard] {e:#}") });
@@ -605,6 +622,12 @@ async fn tunnel_status(tunnels: State<'_, Tunnels>) -> CmdResult<TunnelStatus> {
 /// Starts inviting friends into the world this instance has opened to LAN; returns the invite code.
 #[tauri::command]
 async fn tunnel_invite(instance_id: String, tunnels: State<'_, Tunnels>) -> CmdResult<String> {
+    create_invite(&instance_id, &tunnels).await
+}
+
+/// Starts hosting the instance's open LAN world (or reuses the running host) and returns the code.
+async fn create_invite(instance_id: &str, tunnels: &Tunnels) -> CmdResult<String> {
+    let instance_id = instance_id.to_string();
     let port = tunnels
         .lan_ports
         .lock()

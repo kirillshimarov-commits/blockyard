@@ -13,6 +13,13 @@ public final class BlockyardUi {
     public static int accent = 0x8B5CFF;
     /** Set to open the vanilla title screen once (the "classic menu" item). */
     public static boolean vanillaOnce = false;
+    /** Set to open the vanilla options screen once ("all Minecraft settings"). */
+    public static boolean vanillaOptions = false;
+    /** Open the world to LAN as soon as it has loaded ("play and invite"). */
+    public static boolean inviteOnJoin = false;
+    /** What is being loaded, for the loading screens. */
+    public static String loadingTitle = null;
+    public static net.minecraft.util.Identifier loadingIcon = null;
 
     private static boolean loaded = false;
 
