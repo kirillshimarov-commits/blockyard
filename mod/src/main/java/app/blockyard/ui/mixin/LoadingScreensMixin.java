@@ -1,12 +1,12 @@
 package app.blockyard.ui.mixin;
 
-import app.blockyard.ui.screen.LoadingView;
+import app.blockyard.ui.mc.Screens;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.DownloadingTerrainScreen;
-import net.minecraft.client.gui.screen.world.LevelLoadingScreen;
 import net.minecraft.client.gui.screen.MessageScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
+import net.minecraft.client.gui.screen.world.LevelLoadingScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -23,7 +23,7 @@ public abstract class LoadingScreensMixin {
         else if (self instanceof LevelLoadingScreen) status = "Загружаем мир…";
         else if (self instanceof DownloadingTerrainScreen) status = "Загружаем местность…";
         else status = ((Screen) self).getTitle().getString();
-        LoadingView.render((Screen) self, context, mouseX, mouseY, status);
+        Screens.loading((Screen) self, context, status);
         ci.cancel();
     }
 }

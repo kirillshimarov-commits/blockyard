@@ -1,6 +1,6 @@
 package app.blockyard.ui.mixin;
 
-import app.blockyard.ui.screen.Screens;
+import app.blockyard.ui.mc.Screens;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import org.spongepowered.asm.mixin.Mixin;

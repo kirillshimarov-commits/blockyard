@@ -19,7 +19,8 @@ public final class BlockyardUi {
     public static boolean inviteOnJoin = false;
     /** What is being loaded, for the loading screens. */
     public static String loadingTitle = null;
-    public static net.minecraft.util.Identifier loadingIcon = null;
+    public static java.awt.image.BufferedImage loadingIcon = null;
+    public static String loadingKey = "loading";
 
     private static boolean loaded = false;
 

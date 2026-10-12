@@ -3,7 +3,7 @@
   "id": "blockyard-ui",
   "version": "${version}",
   "name": "Blockyard UI",
-  "description": "Главное меню в стиле лаунчера Blockyard: космический фон, плитки миров и серверов, большая карточка.",
+  "description": "Меню Minecraft в стиле лаунчера Blockyard: главное меню, пауза, настройки, загрузка и все остальные экраны.",
   "authors": ["Blockyard"],
   "license": "MIT",
   "environment": "client",

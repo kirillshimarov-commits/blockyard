@@ -3,6 +3,15 @@
   "minVersion": "0.8",
   "package": "app.blockyard.ui.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["MinecraftClientMixin", "LoadingScreensMixin"],
+  "client": [
+    "MinecraftClientMixin",
+    "LoadingScreensMixin",
+    "ScreenMixin",
+    "DrawContextMixin",
+    "TextRendererMixin",
+    "PressableWidgetMixin",
+    "TabButtonWidgetMixin",
+    "EntryListWidgetMixin"
+  ],
   "injectors": { "defaultRequire": 1 }
 }

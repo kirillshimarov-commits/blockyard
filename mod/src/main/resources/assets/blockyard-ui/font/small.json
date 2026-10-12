@@ -1,4 +1,0 @@
-{"providers": [
-  {"type": "ttf", "file": "blockyard-ui:manrope_semibold.ttf", "size": 3.3, "oversample": 8.0, "shift": [0, 0.1]},
-  {"type": "reference", "id": "minecraft:default"}
-]}
