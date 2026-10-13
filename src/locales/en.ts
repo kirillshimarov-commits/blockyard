@@ -295,7 +295,7 @@ export const en: Record<string, string> = {
   "Авто": "Auto",
   "Меню Blockyard, если оно включено в настройках лаунчера и в сборке нет других модов, меняющих меню (FancyMenu, Drippy Loading Screen).":
     "Blockyard menus if they are on in the launcher settings and no other menu mod is installed (FancyMenu, Drippy Loading Screen).",
-  "Всегда меню в стиле лаунчера (Fabric и Quilt 1.21.1).": "Always the launcher-style menus (Fabric and Quilt 1.21.1).",
+  "Всегда меню в стиле лаунчера (Fabric, Quilt и Forge 1.20.1, Fabric, Quilt и NeoForge 1.21.1).": "Always the launcher-style menus (Fabric, Quilt and Forge 1.20.1; Fabric, Quilt and NeoForge 1.21.1).",
   "Стандартное": "Standard",
   "Обычные меню Minecraft или меню из модов сборки.": "Regular Minecraft menus, or those of the instance's mods.",
   "Настройки сборки сохранены": "Instance settings saved",
@@ -405,8 +405,8 @@ export const en: Record<string, string> = {
   "Minecraft появляется прямо в лаунчере, без отдельного окна. Если вместо игры чёрный экран или не работает мышь — выключите.":
     "Minecraft appears right inside the launcher, without a separate window. Turn this off if you see a black screen or the mouse does not work.",
   "Меню игры в стиле Blockyard": "Blockyard-style game menus",
-  "Мод Blockyard UI делает меню Minecraft как в лаунчере. Пока только для Fabric и Quilt 1.21.1, ставится в такие сборки сам при запуске. Для отдельной сборки это меняется в её настройках → «Окно и меню».":
-    "The Blockyard UI mod makes Minecraft's menus look like the launcher. For now only Fabric and Quilt 1.21.1; it is installed into such instances at launch. Per instance, change it in its settings → “Window and menus”.",
+  "Мод Blockyard UI делает меню Minecraft как в лаунчере. Работает на Fabric, Quilt и Forge 1.20.1 и на Fabric, Quilt и NeoForge 1.21.1, ставится в такие сборки сам при запуске. Для отдельной сборки это меняется в её настройках → «Окно и меню».":
+    "The Blockyard UI mod makes Minecraft's menus look like the launcher. It works on Fabric, Quilt and Forge 1.20.1 and on Fabric, Quilt and NeoForge 1.21.1; it is installed into such instances at launch. Per instance, change it in its settings → “Window and menus”.",
   "Показывать игру в профиле Discord": "Show the game in your Discord profile",
   "Пока идёт игра, друзья в Discord видят название сборки, версию и сколько вы уже играете.":
     "While you play, friends on Discord see the instance name, version and how long you have been playing.",

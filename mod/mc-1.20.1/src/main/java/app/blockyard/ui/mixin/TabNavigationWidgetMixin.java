@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** The tab row (create world and others) sits in one glass bar, like the launcher's tabs. */
@@ -18,6 +19,12 @@ public abstract class TabNavigationWidgetMixin {
     @Shadow
     @Final
     private ImmutableList<TabButtonWidget> tabButtons;
+
+    /** 1.20.1 paints a black strip behind the tabs; the glass bar replaces it. */
+    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V"), require = 0)
+    private void blockyard$strip(DrawContext context, int x1, int y1, int x2, int y2, int color) {
+        if (!Restyle.active()) context.fill(x1, y1, x2, y2, color);
+    }
 
     @Inject(method = "render", at = @At("HEAD"), require = 0)
     private void blockyard$bar(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {

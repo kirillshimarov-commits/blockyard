@@ -204,6 +204,11 @@ public final class Restyle {
         Widgets.tabBar(gui(ctx), x0, y0, x1, y1);
     }
 
+    /** A text field (1.20.1 draws them with fills rather than sprites). */
+    public static void textField(DrawContext ctx, int x, int y, int w, int h, boolean focused) {
+        Widgets.textField(gui(ctx), x, y, w, h, focused);
+    }
+
     public static void selection(DrawContext ctx, int x0, int y0, int x1, int y1) {
         Widgets.selection(gui(ctx), x0, y0, x1, y1, accent());
     }

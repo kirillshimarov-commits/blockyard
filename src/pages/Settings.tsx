@@ -296,7 +296,7 @@ export default function SettingsPage(props: Props) {
         </label>
         <p className="muted small">
           {t(
-            "Мод Blockyard UI делает меню Minecraft как в лаунчере. Пока только для Fabric и Quilt 1.21.1, ставится в такие сборки сам при запуске. Для отдельной сборки это меняется в её настройках → «Окно и меню».",
+            "Мод Blockyard UI делает меню Minecraft как в лаунчере. Работает на Fabric, Quilt и Forge 1.20.1 и на Fabric, Quilt и NeoForge 1.21.1, ставится в такие сборки сам при запуске. Для отдельной сборки это меняется в её настройках → «Окно и меню».",
           )}
         </p>
         <label className="checkbox">

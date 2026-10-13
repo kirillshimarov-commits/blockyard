@@ -112,7 +112,14 @@ public final class Selftest {
             return;
         }
         if (wait == -2) {
-            if (!s.ready().getAsBoolean()) return;
+            if (!s.ready().getAsBoolean()) {
+                // Every 10 seconds of waiting, say what is on screen (helps when a loader adds its own screens).
+                if (total % 200 == 0) {
+                    System.out.println("[Blockyard selftest] waiting at step " + index + ": screen=" + (mc.currentScreen == null ? "none" : mc.currentScreen.getClass().getName())
+                            + " overlay=" + (mc.getOverlay() == null ? "none" : mc.getOverlay().getClass().getName()));
+                }
+                return;
+            }
             wait = s.settle();
             return;
         }

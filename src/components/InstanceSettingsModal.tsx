@@ -50,7 +50,7 @@ const GAME_UI: { value: "" | "on" | "off"; label: string; hint: string }[] = [
     label: "Авто",
     hint: "Меню Blockyard, если оно включено в настройках лаунчера и в сборке нет других модов, меняющих меню (FancyMenu, Drippy Loading Screen).",
   },
-  { value: "on", label: "Blockyard", hint: "Всегда меню в стиле лаунчера (Fabric и Quilt 1.21.1)." },
+  { value: "on", label: "Blockyard", hint: "Всегда меню в стиле лаунчера (Fabric, Quilt и Forge 1.20.1, Fabric, Quilt и NeoForge 1.21.1)." },
   { value: "off", label: "Стандартное", hint: "Обычные меню Minecraft или меню из модов сборки." },
 ];
 

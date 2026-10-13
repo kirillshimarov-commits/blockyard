@@ -13,7 +13,7 @@ on:
         default: ""
 
 jobs:
-  # The in-game menu mod (Fabric 1.21.1); the launcher embeds the jar and installs it into matching instances.
+  # The in-game menu mod (Fabric, Quilt, Forge and NeoForge builds); the launcher embeds the jar and installs it into matching instances.
   mod:
     runs-on: ubuntu-latest
     steps:
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: blockyard-ui-mod
-          path: mod/build/libs/blockyard-ui-*.jar
+          path: mod/*/build/libs/blockyard-ui-*.jar
 
   windows:
     needs: mod
@@ -58,7 +58,7 @@ jobs:
         continue-on-error: true
         with:
           name: blockyard-ui-mod
-          path: mod/build/libs
+          path: mod
 
       - uses: pnpm/action-setup@v4
         with:
