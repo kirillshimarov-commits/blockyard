@@ -2,6 +2,7 @@
 
 pub mod appearance;
 pub mod auth;
+pub mod bisect;
 pub mod crash;
 pub mod curseforge;
 pub mod discord;

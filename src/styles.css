@@ -708,6 +708,55 @@ input[type="range"] {
   border-radius: 12px;
 }
 
+/* ---------- Crash search ---------- */
+
+.crash-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.bisect-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-raised));
+  animation: fade-up 0.3s ease;
+}
+.bisect-panel > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.bisect-panel p {
+  margin: 4px 0 0;
+}
+.bisect-panel.done {
+  align-items: center;
+}
+.bisect-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.bisect-bar {
+  height: 4px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--bg-hover);
+}
+.bisect-bar > div {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.6s ease;
+}
+
 /* ---------- Mod page ---------- */
 
 .modal.mod-page {

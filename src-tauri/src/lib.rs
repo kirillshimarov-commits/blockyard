@@ -208,7 +208,22 @@ async fn start_game(app: AppHandle, id: String, running: &Running, join_port: Op
 
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
+        let launched_before = inst.last_played;
         let result = run_game(&app2, &mut inst, &session, stop, join_port).await;
+        // A crash search step: the game's outcome decides the next step by itself.
+        // Only count runs where the game really started (it marks the instance as played).
+        if inst.last_played != launched_before && launcher::bisect::is_active(&inst.id) {
+            let crashed = result.as_ref().err().is_some_and(|e| e.downcast_ref::<crash::GameCrash>().is_some());
+            let clean = result.is_ok();
+            if crashed || clean {
+                match launcher::bisect::report(&inst.id, crashed) {
+                    Ok(_) => {
+                        let _ = app2.emit("bisect-changed", inst.id.clone());
+                    }
+                    Err(e) => eprintln!("crash search: {e:#}"),
+                }
+            }
+        }
         let none_left = {
             let running = app2.state::<Running>();
             let mut map = running.0.lock().unwrap();
@@ -262,7 +277,9 @@ async fn run_game(
             .map_err(|e| anyhow::anyhow!("Команда перед запуском не выполнилась: {e:#}"))?;
     }
     let launcher_settings = settings::load();
-    let game_ui = launcher::gameui::wanted(&inst.settings.game_ui, launcher_settings.game_ui, &prepared.game_dir);
+    // While searching for a crashing mod, our own menu mod stays out so it cannot skew the result.
+    let game_ui = launcher::gameui::wanted(&inst.settings.game_ui, launcher_settings.game_ui, &prepared.game_dir)
+        && !launcher::bisect::is_active(&inst.id);
     if let Err(e) = launcher::gameui::sync(&prepared.game_dir, inst, game_ui).await {
         eprintln!("Blockyard UI mod: {e:#}");
     }
@@ -610,7 +627,42 @@ async fn test_java(path: String) -> CmdResult<String> {
 
 #[tauri::command]
 fn set_mod_enabled(instance_id: String, project_id: String, enabled: bool) -> CmdResult<Instance> {
+    if launcher::bisect::is_active(&instance_id) {
+        return Err("Сейчас идёт поиск мода, из-за которого вылет: сначала завершите его".into());
+    }
     instance::set_mod_enabled(&instance_id, &project_id, enabled).map_err(err)
+}
+
+// ---------- Crash search ----------
+
+#[tauri::command]
+fn bisect_status(instance_id: String) -> Option<launcher::bisect::Status> {
+    launcher::bisect::status(&instance_id)
+}
+
+#[tauri::command]
+fn bisect_start(instance_id: String, running: State<'_, Running>) -> CmdResult<launcher::bisect::Status> {
+    if running.0.lock().unwrap().contains_key(&instance_id) {
+        return Err("Сначала закройте игру".into());
+    }
+    launcher::bisect::start(&instance_id).map_err(err)
+}
+
+/// For when the player says how the test went instead of waiting for the game to exit.
+#[tauri::command]
+fn bisect_report(instance_id: String, crashed: bool, running: State<'_, Running>) -> CmdResult<launcher::bisect::Status> {
+    if running.0.lock().unwrap().contains_key(&instance_id) {
+        return Err("Сначала закройте игру".into());
+    }
+    launcher::bisect::report(&instance_id, crashed).map_err(err)
+}
+
+#[tauri::command]
+fn bisect_finish(instance_id: String, disable_culprit: bool, running: State<'_, Running>) -> CmdResult<Instance> {
+    if running.0.lock().unwrap().contains_key(&instance_id) {
+        return Err("Сначала закройте игру".into());
+    }
+    launcher::bisect::finish(&instance_id, disable_culprit).map_err(err)
 }
 
 // ---------- Play with a friend ----------
@@ -884,6 +936,10 @@ pub fn run() {
             import_modpack,
             export_instance,
             set_mod_enabled,
+            bisect_status,
+            bisect_start,
+            bisect_report,
+            bisect_finish,
             duplicate_instance,
             save_instance_settings,
             repair_instance,

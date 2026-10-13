@@ -225,6 +225,16 @@ export interface LauncherUpdate {
   url: string;
 }
 
+export interface BisectStatus {
+  step: number;
+  stepsLeft: number;
+  total: number;
+  enabled: number;
+  suspects: number;
+  culprit?: { projectId: string; title: string } | null;
+  notFound: boolean;
+}
+
 export interface LogEvent {
   instanceId: string;
   line: string;
@@ -284,6 +294,11 @@ export const api = {
   testJava: (path: string) => invoke<string>("test_java", { path }),
   setModEnabled: (instanceId: string, projectId: string, enabled: boolean) =>
     invoke<Instance>("set_mod_enabled", { instanceId, projectId, enabled }),
+  bisectStatus: (instanceId: string) => invoke<BisectStatus | null>("bisect_status", { instanceId }),
+  bisectStart: (instanceId: string) => invoke<BisectStatus>("bisect_start", { instanceId }),
+  bisectReport: (instanceId: string, crashed: boolean) => invoke<BisectStatus>("bisect_report", { instanceId, crashed }),
+  bisectFinish: (instanceId: string, disableCulprit: boolean) =>
+    invoke<Instance>("bisect_finish", { instanceId, disableCulprit }),
   launcherVersion: () => invoke<string>("launcher_version"),
   checkLauncherUpdate: () => invoke<LauncherUpdate | null>("check_launcher_update"),
   installLauncherUpdate: (url: string) => invoke<void>("install_launcher_update", { url }),

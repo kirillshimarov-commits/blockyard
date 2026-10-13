@@ -1,8 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { save } from "@tauri-apps/plugin-dialog";
-import { api, ContentFolder, ContentKind, errorText, formatPlayTime, Instance, loaderLabel, Source, TunnelStatus } from "../api";
+import { listen } from "@tauri-apps/api/event";
+import {
+  api,
+  BisectStatus,
+  ContentFolder,
+  ContentKind,
+  errorText,
+  formatPlayTime,
+  Instance,
+  loaderLabel,
+  Source,
+  TunnelStatus,
+} from "../api";
 import ModPageModal from "../components/ModPageModal";
+import BisectPanel from "../components/BisectPanel";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
@@ -39,6 +52,21 @@ export default function InstanceView(props: Props) {
   const [playAfterPending, setPlayAfterPending] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
   const [opened, setOpened] = useState<{ kind: ContentKind; source: Source; projectId: string } | null>(null);
+  const [bisect, setBisect] = useState<BisectStatus | null>(null);
+  const instanceId = instance?.id;
+
+  // The crash search moves on by itself after each test launch; follow it.
+  useEffect(() => {
+    if (!instanceId) return;
+    const load = () => api.bisectStatus(instanceId).then(setBisect).catch(() => setBisect(null));
+    load();
+    const unlisten = listen<string>("bisect-changed", ({ payload }) => {
+      if (payload === instanceId) load();
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, [instanceId]);
   const logRef = useRef<HTMLPreElement>(null);
   const prevState = useRef<string | undefined>(undefined);
   const state = status?.state ?? "stopped";
@@ -91,6 +119,19 @@ export default function InstanceView(props: Props) {
   async function toggleMod(projectId: string, enabled: boolean) {
     try {
       onChanged(await api.setModEnabled(instance!.id, projectId, enabled));
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
+
+  const enabledMods = instance.mods.filter((m) => !m.disabled).length;
+  const canSearch = !bisect && state === "stopped" && enabledMods >= 2;
+
+  async function startSearch() {
+    try {
+      setBisect(await api.bisectStart(instance!.id));
+      onChanged(await api.getInstance(instance!.id));
+      setTab("mods");
     } catch (e) {
       notify(errorText(e), true);
     }
@@ -161,6 +202,17 @@ export default function InstanceView(props: Props) {
           </div>
         </div>
       )}
+      {bisect && (
+        <BisectPanel
+          instance={instance}
+          status={bisect}
+          running={state !== "stopped"}
+          onStatus={setBisect}
+          onChanged={onChanged}
+          onPlay={onPlay}
+          notify={notify}
+        />
+      )}
       <FriendPanel
         instance={instance}
         running={state === "running"}
@@ -188,14 +240,21 @@ export default function InstanceView(props: Props) {
               </div>
             )}
           </div>
-          {status.crashReport && (
-            <button
-              className="btn"
-              onClick={() => openPath(status.crashReport!).catch((e) => notify(errorText(e), true))}
-            >
-              Открыть отчёт о сбое
-            </button>
-          )}
+          <div className="crash-actions">
+            {status.crashReport && (
+              <button
+                className="btn"
+                onClick={() => openPath(status.crashReport!).catch((e) => notify(errorText(e), true))}
+              >
+                Открыть отчёт о сбое
+              </button>
+            )}
+            {canSearch && (
+              <button className="btn" onClick={startSearch} title="Лаунчер по очереди выключит часть модов и найдёт виновника">
+                <Icon name="bug" /> Найти виновника
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -241,6 +300,15 @@ export default function InstanceView(props: Props) {
                   : "Модов пока нет"}
               </span>
               <div className="row gap-sm">
+                {canSearch && (
+                  <button
+                    className="btn icon"
+                    title="Найти мод, из-за которого игра вылетает: лаунчер по очереди выключит часть модов"
+                    onClick={startSearch}
+                  >
+                    <Icon name="bug" />
+                  </button>
+                )}
                 {instance.mods.length > 0 && (
                   <button className="btn" disabled={state !== "stopped"} onClick={() => setShowUpdates(true)}>
                     Проверить обновления
@@ -253,7 +321,7 @@ export default function InstanceView(props: Props) {
             </div>
             <ContentList
               items={instance.mods}
-              disabled={state !== "stopped"}
+              disabled={state !== "stopped" || !!bisect}
               onRemove={(id) => removeContent("mods", id)}
               onToggle={toggleMod}
               onOpen={(m) => setOpened({ kind: "mod", source: m.source, projectId: m.projectId })}
