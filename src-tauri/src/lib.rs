@@ -419,6 +419,17 @@ async fn search_mods(
     .map_err(err)
 }
 
+/// Description, screenshots, versions and dependencies of a project, for its page in the catalog.
+#[tauri::command]
+async fn mod_page(
+    source: Source,
+    project_id: String,
+    game_version: Option<String>,
+    loader: Option<String>,
+) -> CmdResult<launcher::modpage::ModPage> {
+    launcher::modpage::load(source, &project_id, game_version.as_deref(), loader.as_deref()).await.map_err(err)
+}
+
 #[tauri::command]
 async fn install_mod(instance_id: String, source: Source, project_id: String) -> CmdResult<mods::InstallResult> {
     match source {
@@ -857,6 +868,7 @@ pub fn run() {
             minecraft_news,
             game_ui_available,
             search_mods,
+            mod_page,
             install_mod,
             import_pending_mods,
             install_asset,

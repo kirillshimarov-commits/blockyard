@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, ContentKind, errorText, formatNumber, Instance, InstallResult, LOADER_NAMES, ModHit, Source } from "../api";
 import { Icon } from "../components/Icon";
+import ModPageModal, { type InstallState } from "../components/ModPageModal";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
 
 interface Props {
@@ -65,6 +65,7 @@ export default function Browse(props: Props) {
   const [error, setError] = useState("");
   const [installing, setInstalling] = useState<Set<string>>(new Set());
   const [showPending, setShowPending] = useState(false);
+  const [opened, setOpened] = useState<ModHit | null>(null);
 
   const needsTarget = kind !== "modpack";
   const instance = needsTarget ? targets.find((i) => i.id === instanceId) : undefined;
@@ -108,7 +109,7 @@ export default function Browse(props: Props) {
     if (!SORTS.find((s) => s.value === sort)?.sources.includes(next)) setSort("relevance");
   }
 
-  function reportResult(hit: ModHit, res: InstallResult) {
+  function reportResult(title: string, res: InstallResult) {
     onChanged(res.instance);
     res.warnings.forEach((w) => notify(w, true));
     if (res.pending.length > 0) {
@@ -116,12 +117,20 @@ export default function Browse(props: Props) {
       return;
     }
     const count = res.installed.length;
-    if (count === 0) notify(`${hit.title} уже есть в сборке`);
-    else if (count === 1) notify(`${hit.title} установлен`);
+    if (count === 0) notify(`${title} уже есть в сборке`);
+    else if (count === 1) notify(`${title} установлен`);
     else notify(`Установлено: ${res.installed.join(", ")}`);
   }
 
-  async function install(hit: ModHit) {
+  function stateOf(src: Source, projectId: string, title: string): InstallState {
+    const key = `${src}:${projectId}`;
+    if (installing.has(key)) return "installing";
+    if (instance && (installedIds.has(key) || installedTitles.has(normalize(title)))) return "installed";
+    if (pendingIds.has(projectId)) return "pending";
+    return "none";
+  }
+
+  async function install(hit: Pick<ModHit, "source" | "projectId" | "title">) {
     const key = `${hit.source}:${hit.projectId}`;
     setInstalling((s) => new Set(s).add(key));
     try {
@@ -134,7 +143,7 @@ export default function Browse(props: Props) {
           kind === "mod"
             ? await api.installMod(instance.id, hit.source, hit.projectId)
             : await api.installAsset(instance.id, hit.source, hit.projectId, kind);
-        reportResult(hit, res);
+        reportResult(hit.title, res);
       }
     } catch (e) {
       notify(errorText(e), true);
@@ -225,10 +234,12 @@ export default function Browse(props: Props) {
           const canInstall = kind === "modpack" || !!instance;
           return (
             <div key={key} className="mod-card">
-              {hit.iconUrl ? <img src={hit.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
+              <button className="mod-card-icon" title="Подробнее" onClick={() => setOpened(hit)}>
+                {hit.iconUrl ? <img src={hit.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
+              </button>
               <div className="grow">
                 <div className="row gap-sm">
-                  <button className="link mod-title" onClick={() => openUrl(hit.pageUrl)}>
+                  <button className="link mod-title" title="Подробнее" onClick={() => setOpened(hit)}>
                     {hit.title}
                   </button>
                   {hit.author && <span className="muted small">от {hit.author}</span>}
@@ -274,6 +285,19 @@ export default function Browse(props: Props) {
         </div>
       )}
       {!loading && !error && hits.length === 0 && <div className="center muted">Ничего не найдено</div>}
+
+      {opened && (
+        <ModPageModal
+          kind={kind}
+          source={opened.source}
+          projectId={opened.projectId}
+          instance={instance}
+          stateOf={stateOf}
+          onInstall={kind === "modpack" || instance ? (source, projectId, title) => install({ source, projectId, title }) : undefined}
+          onShowPending={() => setShowPending(true)}
+          onClose={() => setOpened(null)}
+        />
+      )}
 
       {showPending && instance && (
         <PendingDownloadsModal instance={instance} onChanged={onChanged} onClose={() => setShowPending(false)} />

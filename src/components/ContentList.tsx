@@ -7,17 +7,25 @@ interface Props {
   onRemove: (projectId: string) => void;
   /** When set, each row gets an on/off switch (mods only). */
   onToggle?: (projectId: string, enabled: boolean) => void;
+  /** Opens the project's page. */
+  onOpen?: (item: InstalledMod) => void;
 }
 
 /** Installed mods, shaders or resource packs with a remove button each. */
-export default function ContentList({ items, disabled, onRemove, onToggle }: Props) {
+export default function ContentList({ items, disabled, onRemove, onToggle, onOpen }: Props) {
   return (
     <div className="mod-list">
       {items.map((m) => (
         <div key={`${m.source}:${m.projectId}`} className={`mod-row ${m.disabled ? "is-disabled" : ""}`}>
           {m.iconUrl ? <img src={m.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
           <div className="grow">
-            <div className="mod-title">{m.title}</div>
+            {onOpen ? (
+              <button className="link mod-title" title="Подробнее" onClick={() => onOpen(m)}>
+                {m.title}
+              </button>
+            ) : (
+              <div className="mod-title">{m.title}</div>
+            )}
             <div className="muted small">
               <span className={`source-badge ${m.source}`}>{m.source === "curseforge" ? "CurseForge" : "Modrinth"}</span>{" "}
               {m.fileName}

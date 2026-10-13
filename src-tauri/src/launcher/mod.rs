@@ -15,6 +15,7 @@ pub mod java;
 pub mod launch;
 pub mod modrinth;
 pub mod modpack;
+pub mod modpage;
 pub mod mods;
 pub mod mojang;
 pub mod news;

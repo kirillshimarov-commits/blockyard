@@ -129,6 +129,40 @@ export interface ModHit {
   pageUrl: string;
 }
 
+export interface ModPage {
+  source: Source;
+  projectId: string;
+  title: string;
+  summary: string;
+  author: string;
+  iconUrl?: string | null;
+  downloads: number;
+  followers?: number | null;
+  categories: string[];
+  pageUrl: string;
+  /** Markdown (Modrinth) or HTML (CurseForge, `bodyHtml`). */
+  body: string;
+  bodyHtml: boolean;
+  gallery: { url: string; thumbnail: string; title?: string | null }[];
+  links: { kind: "website" | "source" | "issues" | "wiki" | "discord"; url: string }[];
+  license?: string | null;
+  updated?: string | null;
+  versions: {
+    name: string;
+    gameVersions: string[];
+    loaders: string[];
+    releaseType: "release" | "beta" | "alpha";
+    date: string;
+    compatible: boolean;
+  }[];
+  dependencies: {
+    projectId: string;
+    title: string;
+    iconUrl?: string | null;
+    kind: "required" | "optional" | "incompatible" | "embedded";
+  }[];
+}
+
 export interface SearchResult {
   hits: ModHit[];
   totalHits: number;
@@ -225,6 +259,8 @@ export const api = {
     sort: string,
     offset: number,
   ) => invoke<SearchResult>("search_mods", { kind, source, query, gameVersion, loader, sort, offset }),
+  modPage: (source: Source, projectId: string, gameVersion: string | null, loader: string | null) =>
+    invoke<ModPage>("mod_page", { source, projectId, gameVersion, loader }),
   installMod: (instanceId: string, source: Source, projectId: string) =>
     invoke<InstallResult>("install_mod", { instanceId, source, projectId }),
   installAsset: (instanceId: string, source: Source, projectId: string, asset: Asset) =>

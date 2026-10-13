@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { save } from "@tauri-apps/plugin-dialog";
-import { api, ContentFolder, errorText, formatPlayTime, Instance, loaderLabel, TunnelStatus } from "../api";
+import { api, ContentFolder, ContentKind, errorText, formatPlayTime, Instance, loaderLabel, Source, TunnelStatus } from "../api";
+import ModPageModal from "../components/ModPageModal";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
@@ -37,6 +38,7 @@ export default function InstanceView(props: Props) {
   const [showPending, setShowPending] = useState(false);
   const [playAfterPending, setPlayAfterPending] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
+  const [opened, setOpened] = useState<{ kind: ContentKind; source: Source; projectId: string } | null>(null);
   const logRef = useRef<HTMLPreElement>(null);
   const prevState = useRef<string | undefined>(undefined);
   const state = status?.state ?? "stopped";
@@ -254,6 +256,7 @@ export default function InstanceView(props: Props) {
               disabled={state !== "stopped"}
               onRemove={(id) => removeContent("mods", id)}
               onToggle={toggleMod}
+              onOpen={(m) => setOpened({ kind: "mod", source: m.source, projectId: m.projectId })}
             />
           </>
         ))}
@@ -279,6 +282,7 @@ export default function InstanceView(props: Props) {
               items={instance.shaders}
               disabled={state !== "stopped"}
               onRemove={(id) => removeContent("shaderpacks", id)}
+              onOpen={(m) => setOpened({ kind: "shader", source: m.source, projectId: m.projectId })}
             />
           </>
         ))}
@@ -299,8 +303,20 @@ export default function InstanceView(props: Props) {
             items={instance.resourcepacks}
             disabled={state !== "stopped"}
             onRemove={(id) => removeContent("resourcepacks", id)}
+            onOpen={(m) => setOpened({ kind: "resourcepack", source: m.source, projectId: m.projectId })}
           />
         </>
+      )}
+
+      {opened && (
+        <ModPageModal
+          kind={opened.kind}
+          source={opened.source}
+          projectId={opened.projectId}
+          instance={instance}
+          stateOf={() => "installed"}
+          onClose={() => setOpened(null)}
+        />
       )}
 
       {showUpdates && (
