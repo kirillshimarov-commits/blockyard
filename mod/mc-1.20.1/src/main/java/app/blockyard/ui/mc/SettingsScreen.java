@@ -271,7 +271,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
 
     private List<SettingsView.Group> packs() {
         ResourcePackManager manager = client.getResourcePackManager();
-        if (packsEnabled == null) packsEnabled = new LinkedHashSet<>(manager.getEnabledIds());
+        if (packsEnabled == null) packsEnabled = new LinkedHashSet<>(manager.getEnabledNames());
         List<SettingsView.Row> actions = List.of(
                 new SettingsView.Button("Применить", "Перезагрузит ресурсы игры", packsDirty ? "Есть изменения" : null, () -> {
                     applyPacks();
@@ -281,7 +281,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
                         () -> Util.getOperatingSystem().open(client.getResourcePackDir().toFile())));
         List<ResourcePackProfile> profiles = new ArrayList<>(manager.getProfiles());
         profiles.sort((p1, p2) -> {
-            boolean e1 = packsEnabled.contains(p1.getId()), e2 = packsEnabled.contains(p2.getId());
+            boolean e1 = packsEnabled.contains(p1.getName()), e2 = packsEnabled.contains(p2.getName());
             if (e1 != e2) return e1 ? -1 : 1;
             return p1.getDisplayName().getString().compareToIgnoreCase(p2.getDisplayName().getString());
         });
@@ -289,10 +289,10 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
         for (ResourcePackProfile p : profiles) {
             String desc = p.getDescription().getString().replace('\n', ' ').trim();
             rows.add(new SettingsView.Toggle(p.getDisplayName().getString(), desc.isEmpty() ? null : desc,
-                    () -> packsEnabled.contains(p.getId()), v -> {
-                        if (p.isRequired()) return;
-                        if (v) packsEnabled.add(p.getId());
-                        else packsEnabled.remove(p.getId());
+                    () -> packsEnabled.contains(p.getName()), v -> {
+                        if (p.isAlwaysEnabled()) return;
+                        if (v) packsEnabled.add(p.getName());
+                        else packsEnabled.remove(p.getName());
                         packsDirty = true;
                         sections = null;
                     }));
