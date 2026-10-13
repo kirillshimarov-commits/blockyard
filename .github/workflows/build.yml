@@ -96,7 +96,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/log"
           cp launcher-build.log "$RUNNER_TEMP/log/build.log" || true
-          grep -nE "^error|error[|warning: unused|FAILED|panicked|ERR_|error TS" launcher-build.log | head -300 > "$RUNNER_TEMP/log/summary.txt" || true
+          grep -nE "^error|error\[|warning: unused|FAILED|panicked|ERR_|error TS" launcher-build.log | head -300 > "$RUNNER_TEMP/log/summary.txt" || true
           echo "${{ job.status }} ${GITHUB_SHA} ${GITHUB_REF_NAME}" > "$RUNNER_TEMP/log/status.txt"
           cd "$RUNNER_TEMP/log"
           git init -q && git checkout -q -b log-launcher
