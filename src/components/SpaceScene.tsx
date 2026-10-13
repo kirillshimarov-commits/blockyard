@@ -1,12 +1,7 @@
 import { useEffect, useRef } from "react";
+import { type HomeStar, homeStarAlpha, spaceBridge } from "./spaceBridge";
 
-interface Star {
-  x: number;
-  y: number;
-  r: number;
-  /** Twinkle phase and speed. */
-  p: number;
-  s: number;
+interface Star extends HomeStar {
   /** Drift per second, in CSS pixels. */
   vx: number;
   vy: number;
@@ -84,12 +79,27 @@ export default function SpaceScene({ accent, animate }: { accent: string; animat
         s.y += s.vy * dt;
         if (s.x > w + 2) s.x -= w + 4;
         if (s.y > h + 2) s.y -= h + 4;
-        const tw = 0.45 + 0.55 * Math.abs(Math.sin(s.p + t * s.s));
-        ctx!.fillStyle = `rgba(${starColor}, ${tw * (0.35 + s.r * 0.45)})`;
-        ctx!.beginPath();
-        ctx!.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx!.fill();
       }
+      // The intro plays in this canvas and gathers its stars into exactly these ones at the end.
+      let glowAlpha = 1;
+      const layer = spaceBridge.layer;
+      if (layer) {
+        const result = layer.draw(ctx!, w, h, t * 1000, { stars, color: starColor });
+        if (result === false) {
+          if (spaceBridge.layer === layer) spaceBridge.layer = null;
+        } else {
+          glowAlpha = result;
+        }
+      }
+      if (!spaceBridge.layer) {
+        for (const s of stars) {
+          ctx!.fillStyle = `rgba(${starColor}, ${homeStarAlpha(s, t)})`;
+          ctx!.beginPath();
+          ctx!.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx!.fill();
+        }
+      }
+      if (glowAlpha <= 0) return;
       for (const g of glows) {
         g.x += (g.vx + Math.sin(t * 0.6 + g.p) * 6) * dt;
         g.y += g.vy * dt;
@@ -99,7 +109,7 @@ export default function SpaceScene({ accent, animate }: { accent: string; animat
         }
         if (g.x < -20) g.x = w + 20;
         if (g.x > w + 20) g.x = -20;
-        const pulse = 0.6 + 0.4 * Math.sin(t * 1.3 + g.p);
+        const pulse = (0.6 + 0.4 * Math.sin(t * 1.3 + g.p)) * glowAlpha;
         const grad = ctx!.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.r * 4);
         grad.addColorStop(0, `rgba(${ar}, ${ag}, ${ab}, ${g.a * pulse})`);
         grad.addColorStop(0.35, `rgba(${ar}, ${ag}, ${ab}, ${g.a * pulse * 0.35})`);
@@ -112,6 +122,7 @@ export default function SpaceScene({ accent, animate }: { accent: string; animat
     }
 
     seed();
+    spaceBridge.hosts += 1;
     let frame = 0;
     let last = performance.now();
     const loop = (now: number) => {
@@ -139,6 +150,7 @@ export default function SpaceScene({ accent, animate }: { accent: string; animat
     window.addEventListener("resize", onResize);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
+      spaceBridge.hosts -= 1;
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibility);

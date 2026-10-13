@@ -2114,12 +2114,10 @@ button.status-chip {
   height: 100%;
 }
 
-/* The intro plays on the home screen's own background; its stars and beams join in at the end. */
-.app.intro-hidden .space-scene canvas,
+/* The intro plays in the home screen's own background canvas; the beams join in at the end. */
 .app.intro-hidden .space-beam::before {
   opacity: 0;
 }
-.app.intro-reveal .space-scene canvas,
 .app.intro-reveal .space-beam::before {
   transition: opacity 1.6s ease;
 }
