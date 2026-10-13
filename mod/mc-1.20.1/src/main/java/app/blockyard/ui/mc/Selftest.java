@@ -65,7 +65,7 @@ public final class Selftest {
         step("13-loading", () -> press(mc.currentScreen, "selectWorld.create"), () -> !(mc.currentScreen instanceof CreateWorldScreen), 20);
         step("14-loading-later", () -> {}, always, 100);
         step("15-in-game", () -> {}, () -> mc.world != null && mc.player != null && mc.currentScreen == null, 200);
-        step("16-pause", () -> mc.openGameMenu(false), always, 30);
+        step("16-pause", () -> mc.openPauseMenu(false), always, 30);
         step("17-stats", () -> mc.setScreen(new StatsScreen(mc.currentScreen, mc.player.getStatHandler())), always, 60);
         step("18-settings-in-game", () -> mc.setScreen(new SettingsScreen(null, SettingsScreen.VIDEO)), always, 30);
         step("19-vanilla-options-in-game", () -> {

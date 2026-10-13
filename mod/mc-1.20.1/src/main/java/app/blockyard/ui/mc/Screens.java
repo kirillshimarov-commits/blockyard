@@ -43,7 +43,7 @@ public final class Screens {
             if (allowedOptions != null && allowedOptions.get() == screen) return screen;
             return new SettingsScreen(client.currentScreen, SettingsScreen.GENERAL);
         }
-        if (screen instanceof GameMenuScreen menu && menu.shouldShowMenu()) return new PauseScreen();
+        if (screen instanceof GameMenuScreen menu && ((app.blockyard.ui.mixin.GameMenuScreenAccessor) menu).blockyard$showMenu()) return new PauseScreen();
         if (screen == null && BlockyardUi.inviteOnJoin && client.world != null && client.isInSingleplayer()) {
             BlockyardUi.inviteOnJoin = false;
             PauseScreen.openToLan(client);

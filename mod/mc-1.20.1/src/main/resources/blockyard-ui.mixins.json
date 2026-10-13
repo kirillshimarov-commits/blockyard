@@ -10,10 +10,10 @@
     "ScreenMixin",
     "DrawContextMixin",
     "TextRendererMixin",
-    "PressableWidgetMixin",
-    "TabButtonWidgetMixin",
+    "ClickableWidgetMixin",
+    "SliderWidgetAccessor",
+    "GameMenuScreenAccessor",
     "EntryListWidgetMixin",
-    "SliderWidgetMixin",
     "TabNavigationWidgetMixin"
   ],
   "injectors": { "defaultRequire": 1 }

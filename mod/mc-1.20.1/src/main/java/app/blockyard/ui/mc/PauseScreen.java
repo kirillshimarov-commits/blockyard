@@ -11,7 +11,7 @@ import net.minecraft.client.gui.screen.StatsScreen;
 import net.minecraft.client.gui.screen.advancement.AdvancementsScreen;
 import net.minecraft.server.integrated.IntegratedServer;
 import net.minecraft.text.Text;
-import net.minecraft.util.NetworkUtils;
+import net.minecraft.client.util.NetworkUtils;
 import org.lwjgl.glfw.GLFW;
 
 import java.nio.file.Files;
