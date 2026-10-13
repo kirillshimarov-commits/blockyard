@@ -199,9 +199,12 @@ fn enc(s: &str) -> String {
 async fn modrinth_page(project_id: &str, game_version: Option<&str>, loader: Option<&str>) -> Result<ModPage> {
     let id = enc(project_id);
     let project: MrProject = http::get_json(&format!("{MODRINTH}/project/{id}")).await?;
+    // The URLs must outlive the requests running side by side.
+    let versions_url = format!("{MODRINTH}/project/{id}/version");
+    let members_url = format!("{MODRINTH}/team/{}/members", enc(&project.team));
     let (versions, members) = tokio::join!(
-        http::get_json::<Vec<MrVersion>>(&format!("{MODRINTH}/project/{id}/version")),
-        http::get_json::<Vec<MrMember>>(&format!("{MODRINTH}/team/{}/members", enc(&project.team))),
+        http::get_json::<Vec<MrVersion>>(&versions_url),
+        http::get_json::<Vec<MrMember>>(&members_url),
     );
     let versions = versions.unwrap_or_default();
     let author = members
@@ -388,10 +391,12 @@ const CF_LOADERS: &[&str] = &["Forge", "Fabric", "Quilt", "NeoForge"];
 
 async fn curseforge_page(project_id: &str, game_version: Option<&str>, loader: Option<&str>) -> Result<ModPage> {
     let id: u64 = project_id.parse()?;
+    let (info_url, description_url, files_url) =
+        (format!("/mods/{id}"), format!("/mods/{id}/description"), format!("/mods/{id}/files?pageSize=50"));
     let (info, description, files) = tokio::join!(
-        curseforge::get::<Envelope<CfMod>>(&format!("/mods/{id}")),
-        curseforge::get::<Envelope<String>>(&format!("/mods/{id}/description")),
-        curseforge::get::<Envelope<Vec<CfFile>>>(&format!("/mods/{id}/files?pageSize=50")),
+        curseforge::get::<Envelope<CfMod>>(&info_url),
+        curseforge::get::<Envelope<String>>(&description_url),
+        curseforge::get::<Envelope<Vec<CfFile>>>(&files_url),
     );
     let info = info?.data;
     let body = description.map(|d| d.data).unwrap_or_default();
