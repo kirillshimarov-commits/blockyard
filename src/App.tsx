@@ -70,7 +70,13 @@ export default function App() {
   const [embedded, setEmbedded] = useState<Record<string, boolean>>({});
   /** null until the appearance is loaded, so the intro does not flash for people who turned it off. */
   const [splash, setSplash] = useState<boolean | null>(null);
-  const hideSplash = useCallback(() => setSplash(false), []);
+  /** Set when the intro starts handing over to the launcher, so the interface fades in under it. */
+  const [revealed, setRevealed] = useState(false);
+  const reveal = useCallback(() => setRevealed(true), []);
+  const hideSplash = useCallback(() => {
+    setSplash(false);
+    setRevealed(true);
+  }, []);
   const hideLaunch = useCallback(() => setLaunching(null), []);
 
   const refreshTunnel = useCallback(() => {
@@ -247,7 +253,9 @@ export default function App() {
   );
 
   return (
-    <div className={`app ${consoleLayout ? "console" : ""}`}>
+    <div
+      className={`app ${consoleLayout ? "console" : ""} ${splash && !revealed ? "intro-hidden" : ""} ${revealed ? "intro-reveal" : ""}`}
+    >
       <div className="app-bg" />
       {consoleLayout && appearance.spaceScene && <SpaceScene accent={appearance.accent} animate={appearance.animations} />}
       {consoleLayout && (
@@ -289,11 +297,8 @@ export default function App() {
                 {updating ? "Скачиваю…" : `Обновить до ${launcherUpdate.version}`}
               </button>
             )}
-            <button className="icon-btn" title="Сетевая игра: зайти в мир друга" onClick={() => setJoining(true)}>
-              <Icon name="users" />
-            </button>
             <button
-              className={`icon-btn ${view.kind === "settings" ? "active" : ""}`}
+              className={`icon-btn spin-on-hover ${view.kind === "settings" ? "active" : ""}`}
               title="Настройки"
               onClick={() => setView({ kind: "settings" })}
             >
@@ -483,7 +488,9 @@ export default function App() {
           onClose={hideLaunch}
         />
       )}
-      {splash && <Splash name={activeAccount?.username ?? settings?.username ?? ""} onDone={hideSplash} />}
+      {splash && (
+        <Splash name={activeAccount?.username ?? settings?.username ?? ""} onReveal={reveal} onDone={hideSplash} />
+      )}
 
       {toast && <div className={`toast ${toast.error ? "error" : ""}`}>{toast.text}</div>}
     </div>

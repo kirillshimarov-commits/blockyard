@@ -12,8 +12,14 @@ const RISE = 1.2;
 const SWELL = 0.3;
 /** Seconds: the shards fly apart from the burst point. */
 const SPREAD = 1.3;
-/** Seconds from the burst to the end of the flight. */
-const FLIGHT = 3.2;
+/** Seconds from the burst to the end of the intro. */
+const FLIGHT = 4.2;
+/** Seconds after the burst when the sky starts melting into the launcher's background. */
+const REVEAL = 2.9;
+/** Seconds the sky takes to melt away. */
+const SKY_FADE = 0.9;
+/** Seconds after the burst when the remaining stars start to fade out. */
+const STARS_FADE = 3.3;
 /** Stars closer to the camera than this have flown past it. */
 const NEAR = 0.15;
 const COLORS = ["255,255,255", "214,228,255", "176,200,255", "150,176,255", "222,208,255"];
@@ -118,11 +124,21 @@ function drawBigStar(ctx: CanvasRenderingContext2D, x: number, y: number, scale:
 
 /**
  * The intro after the greeting: on a dark blue sky a big star rises from the bottom, bursts into
- * a field of small stars, and the camera flies through them. `onEnd` fires shortly before the
- * flight ends, so the launcher can fade in while the stars still rush past.
+ * a field of small stars, and the camera flies through them. The flight then slows down, the sky
+ * melts away (`onReveal`: the launcher fades in underneath) and the last stars fade (`onEnd`).
  */
-export default function IntroStars({ running, onEnd }: { running: boolean; onEnd: () => void }) {
+export default function IntroStars({
+  running,
+  onReveal,
+  onEnd,
+}: {
+  running: boolean;
+  onReveal: () => void;
+  onEnd: () => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const onRevealRef = useRef(onReveal);
+  onRevealRef.current = onReveal;
   const onEndRef = useRef(onEnd);
   onEndRef.current = onEnd;
 
@@ -131,6 +147,7 @@ export default function IntroStars({ running, onEnd }: { running: boolean; onEnd
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) {
+      onRevealRef.current();
       onEndRef.current();
       return;
     }
@@ -156,6 +173,7 @@ export default function IntroStars({ running, onEnd }: { running: boolean; onEnd
     const shards = makeShards();
     const burstAt = RISE + SWELL;
     let camera = 0;
+    let revealed = false;
     let ended = false;
     let frame = 0;
     const start = performance.now();
@@ -169,9 +187,14 @@ export default function IntroStars({ running, onEnd }: { running: boolean; onEnd
       const cy = h / 2;
       const focal = Math.min(w, h) * 0.6;
 
+      // The sky melts away at the end, uncovering the launcher's own space background.
+      const skyAlpha = 1 - clamp01((t - RISE - SWELL - REVEAL) / SKY_FADE);
       ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalAlpha = skyAlpha;
       ctx.fillStyle = sky ?? "#071233";
       ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 1;
 
       if (t < burstAt) {
         // The big star rises, twinkles, then swells.
@@ -184,10 +207,11 @@ export default function IntroStars({ running, onEnd }: { running: boolean; onEnd
         const tb = t - burstAt;
         const spread = easeOutExpo(clamp01(tb / SPREAD));
 
-        // The camera speeds up, cruises, and jumps forward at the very end.
-        const cruise = 1.5 + 14 * easeInOut(clamp01(tb / 1.8));
-        const jump = tb > FLIGHT - 0.8 ? 26 * ((tb - (FLIGHT - 0.8)) / 0.8) ** 2 : 0;
-        camera += (cruise + jump) * dt;
+        // The camera speeds up, cruises, then glides to an almost still drift, like the home screen's sky.
+        const cruise = 1.5 + 14.5 * easeInOut(clamp01(tb / 1.6));
+        const brake = 1 - 0.97 * easeInOut(clamp01((tb - 2.2) / 1.5));
+        camera += cruise * brake * dt;
+        const starsAlpha = 1 - clamp01((tb - STARS_FADE) / (FLIGHT - STARS_FADE));
 
         ctx.globalCompositeOperation = "lighter";
         ctx.lineCap = "round";
@@ -208,7 +232,7 @@ export default function IntroStars({ running, onEnd }: { running: boolean; onEnd
           const sx = cx + (x / d) * focal;
           const sy = cy + (y / d) * focal;
           const size = Math.min(9, (s.size * 6) / d);
-          const alpha = clamp01((DEPTH - d) / (DEPTH * 0.6)) * clamp01(tb * 4);
+          const alpha = clamp01((DEPTH - d) / (DEPTH * 0.6)) * clamp01(tb * 4) * starsAlpha;
           if (alpha <= 0.01) {
             s.seen = false;
             continue;
@@ -269,9 +293,14 @@ export default function IntroStars({ running, onEnd }: { running: boolean; onEnd
           ctx.fillRect(0, 0, w, h);
         }
 
-        if (!ended && tb >= FLIGHT - 0.6) {
+        if (!revealed && tb >= REVEAL) {
+          revealed = true;
+          onRevealRef.current();
+        }
+        if (!ended && tb >= FLIGHT) {
           ended = true;
           onEndRef.current();
+          return;
         }
       }
       frame = requestAnimationFrame(draw);

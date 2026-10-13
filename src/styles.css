@@ -1567,9 +1567,15 @@ textarea:focus {
 .icon-btn.active {
   background: rgb(255 255 255 / 0.1);
 }
+/* The transition lives on the icon itself, so it turns back as smoothly as it turned. */
+.icon-btn svg {
+  transition: transform 0.6s cubic-bezier(0.34, 1.2, 0.5, 1);
+}
 .icon-btn:hover svg {
   transform: rotate(20deg);
-  transition: transform 0.3s;
+}
+.icon-btn.spin-on-hover:hover svg {
+  transform: rotate(90deg);
 }
 .avatar-btn {
   width: 32px;
@@ -2066,7 +2072,10 @@ button.status-chip {
 .splash {
   z-index: 50;
   cursor: pointer;
-  background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--accent) 22%, #0a0815), #040308 70%);
+}
+/* While the sky melts into the launcher, clicks already go to the interface. */
+.splash.reveal {
+  pointer-events: none;
 }
 .splash.leaving,
 .launch-overlay.leaving {
@@ -2075,18 +2084,27 @@ button.status-chip {
   transform: scale(1.04);
   pointer-events: none;
 }
+/* The greeting covers the star canvas, then fades away and uncovers the dark blue sky. */
 .splash-greet {
-  position: relative;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 12px;
-  transition:
-    opacity 0.5s ease,
-    transform 0.5s ease;
+  background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--accent) 22%, #0a0815), #040308 70%);
+  transition: opacity 0.7s ease;
 }
-.splash.stars .splash-greet {
+.splash-greet > * {
+  transition: transform 0.7s ease;
+}
+.splash.stars .splash-greet,
+.splash.reveal .splash-greet {
   opacity: 0;
+}
+.splash.stars .splash-greet > *,
+.splash.reveal .splash-greet > * {
   transform: translateY(-16px);
 }
 .splash-canvas {
@@ -2094,11 +2112,21 @@ button.status-chip {
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0;
-  transition: opacity 0.6s ease;
 }
-.splash.stars .splash-canvas {
-  opacity: 1;
+
+/* The interface waits under the intro and fades in as its sky melts away. */
+.app.intro-hidden > .topbar,
+.app.intro-hidden > main {
+  opacity: 0;
+  transform: scale(0.97) translateY(10px);
+  filter: blur(6px);
+}
+.app.intro-reveal > .topbar,
+.app.intro-reveal > main {
+  transition:
+    opacity 0.9s ease,
+    transform 1.1s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.9s ease;
 }
 .splash-logo {
   width: 96px;
