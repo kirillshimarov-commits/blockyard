@@ -1,9 +1,11 @@
 name: Mod screenshots
 
-# Runs the game with the mod on a virtual screen, walks through every menu (Selftest) and
-# publishes the screenshots to the "shots" branch.
+# Runs the game with the mod on a virtual screen for every loader and game version, walks
+# through every menu (Selftest) and publishes the screenshots and logs to "shots-<target>".
 on:
   workflow_dispatch:
+  push:
+    branches: ["mod-*"]
 
 permissions:
   contents: write
@@ -11,7 +13,11 @@ permissions:
 jobs:
   shots:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ["fabric-1.21.1", "neoforge-1.21.1"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -29,18 +35,24 @@ jobs:
           BLOCKYARD_SELFTEST: "1"
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
-          mkdir -p run
-          printf 'lang:ru_ru\nonboardAccessibility:false\nguiScale:0\nskipMultiplayerWarning:true\ntutorialStep:none\nsoundCategory_master:0.0\nrenderDistance:4\nsimulationDistance:5\n' > run/options.txt
-          timeout 35m xvfb-run -a -s "-screen 0 1920x1080x24" gradle runClient --no-daemon > run/gradle-run.log 2>&1 || true
-          tail -50 run/gradle-run.log
-          ls -la run/screenshots || true
+          run=${{ matrix.target }}/run
+          mkdir -p $run
+          printf 'lang:ru_ru\nonboardAccessibility:false\nguiScale:0\nskipMultiplayerWarning:true\ntutorialStep:none\nsoundCategory_master:0.0\nrenderDistance:4\nsimulationDistance:5\n' > $run/options.txt
+          timeout 40m xvfb-run -a -s "-screen 0 1920x1080x24" gradle :${{ matrix.target }}:runClient --no-daemon > $run/gradle-run.log 2>&1 || true
+          tail -50 $run/gradle-run.log
+          ls -la $run/screenshots || true
       - name: Publish screenshots
+        if: always()
         run: |
+          run=mod/${{ matrix.target }}/run
           mkdir -p /tmp/shots
-          cp mod/run/screenshots/*.png /tmp/shots/ || true
-          cp mod/run/logs/latest.log /tmp/shots/latest.log || true
-          tail -300 mod/run/gradle-run.log > /tmp/shots/gradle-run.log || true
+          cp $run/screenshots/*.png /tmp/shots/ || true
+          cp $run/logs/latest.log /tmp/shots/latest.log || true
+          cp -r $run/crash-reports /tmp/shots/ || true
+          tail -400 $run/gradle-run.log > /tmp/shots/gradle-run.log || true
+          grep -nE "ERROR|Exception|Mixin|mixin|blockyard" $run/logs/latest.log | head -200 > /tmp/shots/problems.txt || true
+          echo "$(ls /tmp/shots/*.png 2>/dev/null | wc -l) screenshots of ${GITHUB_SHA}" > /tmp/shots/status.txt
           cd /tmp/shots
-          git init -q && git checkout -q -b shots
+          git init -q && git checkout -q -b "shots-${{ matrix.target }}"
           git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "Screenshots of ${GITHUB_SHA}"
-          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" shots
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" "shots-${{ matrix.target }}"

@@ -5,11 +5,6 @@ plugins {
 apply from: rootProject.file("shared.gradle")
 
 loom {
-    // NeoForge runs on Mojang names: the Yarn names in the mixins need a refmap.
-    mixin {
-        useLegacyMixinAp.set(true)
-        defaultRefmapName.set("blockyard-ui-refmap.json")
-    }
     runs {
         client {
             programArgs "--width", "1920", "--height", "1080"

@@ -11,6 +11,15 @@ sourceSets {
     }
 }
 
+// One refmap name everywhere, matching blockyard-ui.mixins.json (Forge and NeoForge need it to
+// find the Yarn-named targets on Mojang names).
+loom {
+    mixin {
+        useLegacyMixinAp.set(true)
+        defaultRefmapName.set("blockyard-ui-refmap.json")
+    }
+}
+
 repositories {
     maven { url = "https://maven.architectury.dev/" }
     maven { url = "https://maven.neoforged.net/releases/" }
