@@ -2114,7 +2114,17 @@ button.status-chip {
   height: 100%;
 }
 
-/* The interface waits under the intro and fades in as its sky melts away. */
+/* The intro plays on the home screen's own background; its stars and beams join in at the end. */
+.app.intro-hidden .space-scene canvas,
+.app.intro-hidden .space-beam::before {
+  opacity: 0;
+}
+.app.intro-reveal .space-scene canvas,
+.app.intro-reveal .space-beam::before {
+  transition: opacity 1.6s ease;
+}
+
+/* The interface waits under the intro and fades in as the flight slows down. */
 .app.intro-hidden > .topbar,
 .app.intro-hidden > main {
   opacity: 0;

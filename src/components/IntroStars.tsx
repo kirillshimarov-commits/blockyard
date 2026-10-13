@@ -14,10 +14,8 @@ const SWELL = 0.3;
 const SPREAD = 1.3;
 /** Seconds from the burst to the end of the intro. */
 const FLIGHT = 4.2;
-/** Seconds after the burst when the sky starts melting into the launcher's background. */
-const REVEAL = 2.9;
-/** Seconds the sky takes to melt away. */
-const SKY_FADE = 0.9;
+/** Seconds after the burst when the launcher's own stars, beams and interface start to appear. */
+const REVEAL = 2.6;
 /** Seconds after the burst when the remaining stars start to fade out. */
 const STARS_FADE = 3.3;
 /** Stars closer to the camera than this have flown past it. */
@@ -123,9 +121,10 @@ function drawBigStar(ctx: CanvasRenderingContext2D, x: number, y: number, scale:
 }
 
 /**
- * The intro after the greeting: on a dark blue sky a big star rises from the bottom, bursts into
- * a field of small stars, and the camera flies through them. The flight then slows down, the sky
- * melts away (`onReveal`: the launcher fades in underneath) and the last stars fade (`onEnd`).
+ * The intro after the greeting, drawn over the home screen's own space background: a big star
+ * rises from the bottom, bursts into a field of small stars, and the camera flies through them.
+ * The flight then slows down (`onReveal`: the launcher's stars, beams and interface fade in)
+ * and the last stars of the intro fade away (`onEnd`).
  */
 export default function IntroStars({
   running,
@@ -154,7 +153,6 @@ export default function IntroStars({
 
     let w = 0;
     let h = 0;
-    let sky: CanvasGradient | null = null;
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       w = canvas.clientWidth;
@@ -162,10 +160,6 @@ export default function IntroStars({
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      sky = ctx.createRadialGradient(w / 2, h * 0.55, 0, w / 2, h * 0.55, Math.hypot(w, h) * 0.6);
-      sky.addColorStop(0, "#0d1d52");
-      sky.addColorStop(0.55, "#071233");
-      sky.addColorStop(1, "#02060f");
     };
     resize();
     window.addEventListener("resize", resize);
@@ -187,14 +181,10 @@ export default function IntroStars({
       const cy = h / 2;
       const focal = Math.min(w, h) * 0.6;
 
-      // The sky melts away at the end, uncovering the launcher's own space background.
-      const skyAlpha = 1 - clamp01((t - RISE - SWELL - REVEAL) / SKY_FADE);
+      // No sky of its own: the canvas is transparent over the launcher's space background,
+      // so the scene ends on exactly the home screen's colors.
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, w, h);
-      ctx.globalAlpha = skyAlpha;
-      ctx.fillStyle = sky ?? "#071233";
-      ctx.fillRect(0, 0, w, h);
-      ctx.globalAlpha = 1;
 
       if (t < burstAt) {
         // The big star rises, twinkles, then swells.
