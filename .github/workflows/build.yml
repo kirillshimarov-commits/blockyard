@@ -49,6 +49,8 @@ jobs:
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
       # Azure app id for Microsoft login; the button is disabled when it is missing.
       MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+      # Discord application id for Rich Presence; the profile status is off when it is missing.
+      DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
 

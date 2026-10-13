@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { save } from "@tauri-apps/plugin-dialog";
-import { api, ContentFolder, errorText, Instance, loaderLabel, TunnelStatus } from "../api";
+import { api, ContentFolder, errorText, formatPlayTime, Instance, loaderLabel, TunnelStatus } from "../api";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
@@ -112,6 +112,7 @@ export default function InstanceView(props: Props) {
           <p className="muted">
             Minecraft {instance.gameVersion} · {loaderLabel(instance.loader)} · {instance.memoryMb} МБ ОЗУ
             {instance.modpack ? ` · модпак «${instance.modpack.title}»` : ""}
+            {formatPlayTime(instance.playSeconds) ? ` · наиграно ${formatPlayTime(instance.playSeconds)}` : ""}
           </p>
         </div>
         <button className="btn icon" title="Настройки сборки" onClick={() => setShowSettings(true)}>

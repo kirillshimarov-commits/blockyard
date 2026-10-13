@@ -28,6 +28,12 @@ export interface Appearance {
   spaceScene: boolean;
   /** Intro animation when the launcher opens. */
   splash: boolean;
+  /** Interface sounds: tile ticks, "Play", the intro. */
+  sounds: boolean;
+  /** Percent. */
+  soundVolume: number;
+  /** Interface language. */
+  language: "ru" | "en";
 }
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -47,6 +53,9 @@ export const DEFAULT_APPEARANCE: Appearance = {
   layout: "console",
   spaceScene: true,
   splash: true,
+  sounds: true,
+  soundVolume: 60,
+  language: "ru",
 };
 
 export const ACCENTS = [

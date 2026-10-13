@@ -28,6 +28,17 @@ impl Loader {
         }
     }
 
+    /// Name to show people, without the version.
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Loader::Vanilla => "Vanilla",
+            Loader::Fabric { .. } => "Fabric",
+            Loader::Quilt { .. } => "Quilt",
+            Loader::Forge { .. } => "Forge",
+            Loader::NeoForge { .. } => "NeoForge",
+        }
+    }
+
     /// Modrinth slug of the mod that loads shader packs on this loader.
     pub fn shader_mod(&self) -> Option<&'static str> {
         match self {
@@ -86,6 +97,9 @@ pub struct Instance {
     pub created_at: u64,
     #[serde(default)]
     pub last_played: Option<u64>,
+    /// Time spent in the game, in seconds, over all launches.
+    #[serde(default)]
+    pub play_seconds: u64,
     #[serde(default)]
     pub mods: Vec<InstalledMod>,
     /// Mods waiting for the user to download them in the browser.
@@ -216,6 +230,7 @@ pub fn create(name: &str, game_version: &str, loader: Loader, memory_mb: u32) ->
         memory_mb,
         created_at: now(),
         last_played: None,
+        play_seconds: 0,
         mods: Vec::new(),
         pending: Vec::new(),
         shaders: Vec::new(),
@@ -250,6 +265,17 @@ pub fn remove_content(id: &str, folder: &str, project_id: &str) -> Result<Instan
     instance.pending.retain(|p| p.project_id != project_id);
     instance.save()?;
     Ok(instance)
+}
+
+/// Adds a finished session to the instance's play time. Reads the instance again, so changes
+/// made while the game was running are kept.
+pub fn add_play_time(id: &str, seconds: u64) -> Result<()> {
+    if seconds == 0 {
+        return Ok(());
+    }
+    let mut instance = get(id)?;
+    instance.play_seconds += seconds;
+    instance.save()
 }
 
 /// Turns a mod on or off by renaming its file to/from "<file>.disabled".
@@ -296,6 +322,7 @@ pub fn duplicate(id: &str) -> Result<Instance> {
     copy.name = format!("{} (копия)", source.name);
     copy.created_at = now();
     copy.last_played = None;
+    copy.play_seconds = 0;
     copy_dir(&source.game_dir(), &copy.game_dir())?;
     copy.save()?;
     Ok(copy)

@@ -15,11 +15,20 @@ pub struct Settings {
     pub embed_game: bool,
     /// Install the Blockyard UI mod (launcher-style main menu) where it is supported.
     pub game_ui: bool,
+    /// Show the running game in the Discord profile.
+    pub discord: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { username: "Player".into(), memory_mb: 4096, active_account: None, embed_game: true, game_ui: true }
+        Self {
+            username: "Player".into(),
+            memory_mb: 4096,
+            active_account: None,
+            embed_game: true,
+            game_ui: true,
+            discord: true,
+        }
     }
 }
 

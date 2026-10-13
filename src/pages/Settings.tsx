@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Account, api, errorText, Settings } from "../api";
 import MicrosoftLoginModal from "../components/MicrosoftLoginModal";
 import { Icon } from "../components/Icon";
+import { sounds } from "../sounds";
 import {
   ACCENTS,
   Appearance,
@@ -112,11 +113,23 @@ export default function SettingsPage(props: Props) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [msAvailable, setMsAvailable] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
+  const [discordAvailable, setDiscordAvailable] = useState(false);
 
   useEffect(() => {
     api.listAccounts().then(setAccounts).catch(() => {});
     api.microsoftAvailable().then(setMsAvailable).catch(() => {});
+    api.discordAvailable().then(setDiscordAvailable).catch(() => {});
   }, []);
+
+  async function saveToggle(patch: Partial<Settings>) {
+    const next = { ...settings, ...patch };
+    try {
+      await api.saveSettings(next);
+      onSaved(next);
+    } catch (err) {
+      notify(errorText(err), true);
+    }
+  }
 
   async function selectAccount(activeAccount: string | null) {
     const next = { ...settings, activeAccount };
@@ -157,7 +170,13 @@ export default function SettingsPage(props: Props) {
 
   async function save() {
     try {
-      const next = { ...draft, activeAccount: settings.activeAccount, embedGame: settings.embedGame, gameUi: settings.gameUi };
+      const next = {
+        ...draft,
+        activeAccount: settings.activeAccount,
+        embedGame: settings.embedGame,
+        gameUi: settings.gameUi,
+        discord: settings.discord,
+      };
       await api.saveSettings(next);
       onSaved(next);
       notify("Настройки сохранены");
@@ -276,6 +295,20 @@ export default function SettingsPage(props: Props) {
         <p className="muted small">
           Мод Blockyard UI делает меню Minecraft как в лаунчере. Пока только для Fabric и Quilt 1.21.1, ставится в
           такие сборки сам при запуске. Для отдельной сборки это меняется в её настройках → «Окно и меню».
+        </p>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={settings.discord ?? true}
+            disabled={!discordAvailable}
+            onChange={(e) => saveToggle({ discord: e.target.checked })}
+          />
+          Показывать игру в профиле Discord
+        </label>
+        <p className="muted small">
+          {discordAvailable
+            ? "Пока идёт игра, друзья в Discord видят название сборки, версию и сколько вы уже играете."
+            : "Появится, когда в сборку лаунчера добавят DISCORD_CLIENT_ID."}
         </p>
 
         <h3 className="section-gap">Новые сборки</h3>
@@ -415,6 +448,20 @@ export default function SettingsPage(props: Props) {
           <input type="checkbox" checked={a.animations} onChange={(e) => set("animations", e.target.checked)} />
           Анимации
         </label>
+        <label className="checkbox">
+          <input type="checkbox" checked={a.sounds} onChange={(e) => set("sounds", e.target.checked)} />
+          Звуки интерфейса
+        </label>
+        {a.sounds && (
+          <div className="row gap-sm">
+            <div className="grow">
+              <Slider label="Громкость звуков" value={a.soundVolume} min={5} max={100} step={5} suffix="%" onChange={(v) => set("soundVolume", v)} />
+            </div>
+            <button className="btn icon" title="Послушать" onClick={() => sounds.play()}>
+              <Icon name="volume" />
+            </button>
+          </div>
+        )}
         {a.layout === "classic" && (
           <label className="checkbox">
             <input

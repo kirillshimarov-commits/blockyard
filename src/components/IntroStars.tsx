@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { type HomeStar, homeStarAlpha, type SpaceLayer, spaceBridge } from "./spaceBridge";
+import { sounds } from "../sounds";
 
 /** Number of small stars the big one bursts into. */
 const COUNT = 1400;
@@ -169,6 +170,7 @@ function createIntro(onReveal: () => void, onEnd: () => void): SpaceLayer {
   let last = 0;
   let camera = 0;
   let revealed = false;
+  let burst = false;
   let pairs: Int32Array | null = null;
   let pairedFor: HomeStar[] | null = null;
   let paired: Uint8Array = new Uint8Array(COUNT);
@@ -178,6 +180,7 @@ function createIntro(onReveal: () => void, onEnd: () => void): SpaceLayer {
       if (start < 0) {
         start = now;
         last = now;
+        sounds.rise();
       }
       const t = (now - start) / 1000;
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -197,7 +200,11 @@ function createIntro(onReveal: () => void, onEnd: () => void): SpaceLayer {
       }
 
       const tb = t - burstAt;
-      const settle = easeInOut(clamp01((tb - SETTLE_AT) / SETTLE));
+      if (!burst) {
+        burst = true;
+        sounds.burst();
+      }
+      const settle =easeInOut(clamp01((tb - SETTLE_AT) / SETTLE));
       if (tb >= SETTLE_AT + SETTLE) {
         // The stars sit exactly where the home screen draws its own: hand them over.
         onEnd();

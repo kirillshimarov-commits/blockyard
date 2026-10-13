@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { api, ContentKind, errorText, Instance, loaderLabel } from "../api";
+import { api, ContentKind, errorText, formatPlayTime, Instance, loaderLabel } from "../api";
 import type { GameStatus } from "../App";
 import CreateInstanceModal from "../components/CreateInstanceModal";
 import { Icon } from "../components/Icon";
 import InstanceCover from "../components/InstanceCover";
 import HomeShelf from "../components/HomeShelf";
+import { sounds } from "../sounds";
 
 interface Props {
   instances: Instance[];
@@ -58,6 +59,7 @@ export default function Home(props: Props) {
   const state = selected ? (status[selected.id]?.state ?? "stopped") : "stopped";
 
   function select(id: string) {
+    if (id !== selected?.id) sounds.tick();
     setSelectedId(id);
     setMenu(false);
     try {
@@ -215,6 +217,11 @@ export default function Home(props: Props) {
               <span className="dot" data-state={state} />
               {state === "running" ? "Игра запущена" : state === "installing" ? "Запуск…" : lastPlayedLabel(selected.lastPlayed)}
             </span>
+            {formatPlayTime(selected.playSeconds) && (
+              <span className="chip" title="Сколько времени вы провели в этой сборке">
+                <Icon name="clock" size={13} /> {formatPlayTime(selected.playSeconds)}
+              </span>
+            )}
             <span className="chip">{selected.mods.length ? `${selected.mods.length} модов` : "Без модов"}</span>
             {selected.shaders.length > 0 && <span className="chip">Шейдеры: {selected.shaders.length}</span>}
             {selected.pending.length > 0 && <span className="chip warn">Скачать вручную: {selected.pending.length}</span>}

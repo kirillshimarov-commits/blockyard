@@ -26,6 +26,8 @@ export interface Instance {
   memoryMb: number;
   createdAt: number;
   lastPlayed?: number | null;
+  /** Time spent in the game, in seconds. */
+  playSeconds?: number;
   mods: InstalledMod[];
   pending: PendingDownload[];
   shaders: InstalledMod[];
@@ -76,6 +78,8 @@ export interface Settings {
   embedGame: boolean;
   /** Install the Blockyard UI mod (launcher-style main menu) where supported. */
   gameUi: boolean;
+  /** Show the running game in the Discord profile. */
+  discord: boolean;
   /** UUID of the Microsoft account in use; offline when empty. */
   activeAccount?: string | null;
 }
@@ -209,6 +213,7 @@ export const api = {
   launch: (id: string) => invoke<void>("launch_instance", { id }),
   stop: (id: string) => invoke<void>("stop_instance", { id }),
   curseforgeAvailable: () => invoke<boolean>("curseforge_available"),
+  discordAvailable: () => invoke<boolean>("discord_available"),
   minecraftNews: () => invoke<News[]>("minecraft_news"),
   gameUiAvailable: () => invoke<boolean>("game_ui_available"),
   search: (
@@ -274,6 +279,18 @@ export function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")} млн`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")} тыс.`;
   return String(n);
+}
+
+/** Play time like "12 ч 5 мин"; empty when the instance has not been played yet. */
+export function formatPlayTime(seconds?: number): string {
+  const s = seconds ?? 0;
+  if (s <= 0) return "";
+  if (s < 60) return "меньше минуты";
+  const minutes = Math.floor(s / 60);
+  if (minutes < 60) return `${minutes} мин`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours >= 10 || rest === 0 ? `${hours} ч` : `${hours} ч ${rest} мин`;
 }
 
 export function errorText(e: unknown): string {

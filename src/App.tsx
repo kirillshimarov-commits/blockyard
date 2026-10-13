@@ -20,6 +20,7 @@ import {
   loadAppearance,
   saveAppearance,
 } from "./appearance";
+import { configureSounds, sounds } from "./sounds";
 
 export type View =
   | { kind: "library" }
@@ -128,6 +129,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    configureSounds(appearance.sounds, appearance.soundVolume / 100);
+  }, [appearance.sounds, appearance.soundVolume]);
+
+  useEffect(() => {
     applyAppearance(appearance, activeEffect);
     if (appearance.theme !== "system") return;
     // Follow the OS when it switches between light and dark.
@@ -204,6 +209,7 @@ export default function App() {
 
   const play = useCallback(
     async (id: string) => {
+      sounds.play();
       try {
         setStatus((s) => ({ ...s, [id]: { state: "installing" } }));
         setLaunching(id);
@@ -267,7 +273,10 @@ export default function App() {
                 <button
                   key={item.key}
                   className={`tab-pill ${active === item.key ? "active" : ""}`}
-                  onClick={() => setView(item.view)}
+                  onClick={() => {
+                    if (active !== item.key) sounds.tick();
+                    setView(item.view);
+                  }}
                 >
                   {item.label}
                 </button>

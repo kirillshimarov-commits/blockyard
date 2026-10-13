@@ -209,7 +209,15 @@ async fn start_game(app: AppHandle, id: String, running: &Running, join_port: Op
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         let result = run_game(&app2, &mut inst, &session, stop, join_port).await;
-        app2.state::<Running>().0.lock().unwrap().remove(&inst.id);
+        let none_left = {
+            let running = app2.state::<Running>();
+            let mut map = running.0.lock().unwrap();
+            map.remove(&inst.id);
+            map.is_empty()
+        };
+        if none_left {
+            launcher::discord::set(None);
+        }
         // The world is gone with the game: forget its LAN port and stop inviting friends to it.
         let tunnels = app2.state::<Tunnels>();
         tunnels.lan_ports.lock().unwrap().remove(&inst.id);
@@ -262,6 +270,13 @@ async fn run_game(
     let mut child = launch::spawn(&prepared)?;
     launch::mark_played(inst)?;
     emit_state(app, &inst.id, "running", None);
+    if launcher_settings.discord {
+        launcher::discord::set(Some(launcher::discord::Activity {
+            details: inst.name.clone(),
+            state: format!("Minecraft {} · {}", inst.game_version, inst.loader.display_name()),
+            start: launcher::now(),
+        }));
+    }
 
     // Fullscreen and wrapped launches keep their own window: a wrapper's PID is not the game's.
     let embed = launcher_settings.embed_game && !inst.settings.fullscreen && inst.settings.wrapper.trim().is_empty();
@@ -337,6 +352,10 @@ async fn run_game(
         }
     }
     Ok(()) }.await;
+    let played = started.elapsed().map(|d| d.as_secs()).unwrap_or(0);
+    if let Err(e) = instance::add_play_time(&inst.id, played) {
+        eprintln!("play time: {e:#}");
+    }
     let _ = std::fs::remove_file(&invite_file);
     if !post_exit.is_empty() {
         if let Err(e) = launch::run_hook(&post_exit, &game_dir).await {
@@ -375,6 +394,11 @@ fn game_ui_available() -> bool {
 #[tauri::command]
 fn curseforge_available() -> bool {
     curseforge::is_available()
+}
+
+#[tauri::command]
+fn discord_available() -> bool {
+    launcher::discord::is_available()
 }
 
 #[tauri::command]
@@ -829,6 +853,7 @@ pub fn run() {
             launch_instance,
             stop_instance,
             curseforge_available,
+            discord_available,
             minecraft_news,
             game_ui_available,
             search_mods,
