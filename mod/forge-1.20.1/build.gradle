@@ -1,0 +1,22 @@
+plugins {
+    id "dev.architectury.loom"
+}
+
+apply from: rootProject.file("shared.gradle")
+
+loom {
+    forge {
+        mixinConfig "blockyard-ui.mixins.json"
+    }
+    runs {
+        client {
+            programArgs "--width", "1920", "--height", "1080"
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    forge "net.minecraftforge:forge:${project.forge_version}"
+}
