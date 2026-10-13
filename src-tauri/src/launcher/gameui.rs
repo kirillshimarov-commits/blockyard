@@ -10,20 +10,34 @@ use super::modrinth;
 use anyhow::Result;
 use std::path::Path;
 
-static JAR: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/blockyard-ui.jar"));
+mod jars {
+    include!(concat!(env!("OUT_DIR"), "/gameui_jars.rs"));
+}
 const FILE_NAME: &str = "blockyard-ui.jar";
 /// Fabric API loads the mod's fonts and textures; installed alongside when the user has none.
 const FABRIC_API: &str = "P7dR8mSH";
 const FABRIC_API_FILE: &str = "blockyard-fabric-api.jar";
 
-/// Whether this launcher build carries the mod.
+/// Whether this launcher build carries the mod for any game version.
 pub fn available() -> bool {
-    !JAR.is_empty()
+    !jars::JARS.is_empty()
 }
 
-/// Game versions and loaders the mod is built for (Quilt loads Fabric mods too).
+/// The build of the mod for the instance's loader and game version (Quilt loads Fabric mods too).
+fn jar_for(instance: &Instance) -> Option<&'static [u8]> {
+    let loader = match instance.loader {
+        Loader::Fabric { .. } | Loader::Quilt { .. } => "fabric",
+        Loader::Forge { .. } => "forge",
+        Loader::NeoForge { .. } => "neoforge",
+        Loader::Vanilla => return None,
+    };
+    let target = format!("{loader}-{}", instance.game_version);
+    jars::JARS.iter().find(|(t, _)| *t == target).map(|(_, jar)| *jar)
+}
+
+/// Whether the mod is built for this instance's loader and game version.
 pub fn supports(instance: &Instance) -> bool {
-    matches!(instance.loader, Loader::Fabric { .. } | Loader::Quilt { .. }) && instance.game_version == "1.21.1"
+    jar_for(instance).is_some()
 }
 
 /// Mods that replace the menus themselves; with one of them the automatic mode stays out of the way.
@@ -70,19 +84,24 @@ pub async fn sync(game_dir: &Path, instance: &Instance, enabled: bool) -> Result
     let mods = game_dir.join("mods");
     let jar = mods.join(FILE_NAME);
     let api = mods.join(FABRIC_API_FILE);
-    if !(enabled && available() && supports(instance)) {
+    let Some(bytes) = jar_for(instance).filter(|_| enabled) else {
         for file in [&jar, &api] {
             if file.exists() {
                 std::fs::remove_file(file)?;
             }
         }
         return Ok(());
-    }
+    };
     std::fs::create_dir_all(&mods)?;
-    if std::fs::read(&jar).ok().as_deref() != Some(JAR) {
-        std::fs::write(&jar, JAR)?;
+    if std::fs::read(&jar).ok().as_deref() != Some(bytes) {
+        std::fs::write(&jar, bytes)?;
     }
-    ensure_fabric_api(&mods, instance).await?;
+    // Only the Fabric build needs Fabric API; Forge and NeoForge load the mod's assets themselves.
+    if matches!(instance.loader, Loader::Fabric { .. } | Loader::Quilt { .. }) {
+        ensure_fabric_api(&mods, instance).await?;
+    } else if api.exists() {
+        std::fs::remove_file(&api)?;
+    }
 
     let saved = appearance::load();
     let accent = appearance::field(&saved, "accent", "#8b5cff");

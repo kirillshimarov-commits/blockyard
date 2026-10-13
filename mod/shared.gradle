@@ -17,12 +17,6 @@ repositories {
     maven { url = "https://maven.minecraftforge.net/" }
 }
 
-loom {
-    mixin {
-        defaultRefmapName.set("blockyard-ui-refmap.json")
-    }
-}
-
 processResources {
     inputs.property "version", project.version
     filesMatching(["fabric.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml"]) {

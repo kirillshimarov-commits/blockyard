@@ -38,7 +38,7 @@ jobs:
           mkdir -p /tmp/log
           cp build.log /tmp/log/build.log || true
           grep -nE "error:|FAILED|BUILD (SUCCESSFUL|FAILED)|What went wrong|Could not" build.log | head -300 > /tmp/log/summary.txt || true
-          ls -la mod/*/build/libs > /tmp/log/jars.txt 2>&1 || true
+          for j in mod/*/build/libs/*.jar; do echo "== $j"; unzip -l "$j" | grep -vE "/core/|/font/|.class$" ; done > /tmp/log/jars.txt 2>&1 || true
           echo "${{ steps.build.outcome }} ${GITHUB_SHA}" > /tmp/log/status.txt
           cd /tmp/log
           git init -q && git checkout -q -b "log-${GITHUB_REF_NAME}"
