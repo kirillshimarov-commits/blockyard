@@ -11,6 +11,7 @@ import {
   McVersion,
 } from "../api";
 import { compressImage } from "../appearance";
+import { t } from "../i18n";
 import { Icon, IconName } from "./Icon";
 import InstanceCover from "./InstanceCover";
 
@@ -27,6 +28,7 @@ interface Props {
   notify: (text: string, error?: boolean) => void;
 }
 
+// Labels and hints are Russian and translated where they are shown.
 type Section = "general" | "install" | "window" | "java" | "hooks";
 const SECTIONS: { key: Section; label: string; icon: IconName }[] = [
   { key: "general", label: "Основные", icon: "info" },
@@ -116,7 +118,7 @@ export default function InstanceSettingsModal(props: Props) {
     setSaving(true);
     try {
       onChanged(await api.saveInstanceSettings(instance.id, draft));
-      notify("Настройки сборки сохранены");
+      notify(t("Настройки сборки сохранены"));
       onClose();
     } catch (e) {
       notify(errorText(e), true);
@@ -137,9 +139,9 @@ export default function InstanceSettingsModal(props: Props) {
 
   async function duplicate() {
     try {
-      notify("Копирую сборку…");
+      notify(t("Копирую сборку…"));
       const copy = await api.duplicateInstance(instance.id);
-      notify(`Создана «${copy.name}»`);
+      notify(t("Создана «{name}»", { name: copy.name }));
       onDuplicated(copy);
     } catch (e) {
       notify(errorText(e), true);
@@ -147,7 +149,7 @@ export default function InstanceSettingsModal(props: Props) {
   }
 
   async function remove() {
-    if (!window.confirm(`Удалить сборку «${instance.name}» вместе с мирами и модами?`)) return;
+    if (!window.confirm(t("Удалить сборку «{name}» вместе с мирами и модами?", { name: instance.name }))) return;
     try {
       await api.deleteInstance(instance.id);
       onDeleted();
@@ -165,7 +167,7 @@ export default function InstanceSettingsModal(props: Props) {
   }
 
   async function checkJava(path = draft.settings.javaPath) {
-    setJavaCheck("Проверяю…");
+    setJavaCheck(t("Проверяю…"));
     try {
       setJavaCheck(`✓ ${await api.testJava(path)}`);
     } catch (e) {
@@ -175,6 +177,8 @@ export default function InstanceSettingsModal(props: Props) {
 
   const preview: Instance = { ...instance, name: draft.name, iconUrl: draft.iconUrl };
   const s = draft.settings;
+  const channelHint = CHANNELS.find((c) => c.value === s.updateChannel)?.hint;
+  const gameUiHint = GAME_UI.find((o) => o.value === (s.gameUi ?? ""))?.hint;
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
@@ -183,8 +187,8 @@ export default function InstanceSettingsModal(props: Props) {
           <InstanceCover instance={preview} />
           <span className="muted">{instance.name}</span>
           <span className="muted">›</span>
-          <strong>Настройки</strong>
-          <button className="btn icon close" title="Закрыть" onClick={onClose}>
+          <strong>{t("Настройки")}</strong>
+          <button className="btn icon close" title={t("Закрыть")} onClick={onClose}>
             ✕
           </button>
         </header>
@@ -193,7 +197,7 @@ export default function InstanceSettingsModal(props: Props) {
           <nav className="settings-nav">
             {SECTIONS.map((sec) => (
               <button key={sec.key} className={section === sec.key ? "on" : ""} onClick={() => setSection(sec.key)}>
-                <Icon name={sec.icon} size={16} /> {sec.label}
+                <Icon name={sec.icon} size={16} /> {t(sec.label)}
               </button>
             ))}
           </nav>
@@ -203,17 +207,17 @@ export default function InstanceSettingsModal(props: Props) {
               <>
                 <div className="row top">
                   <label className="field grow">
-                    <span>Название</span>
+                    <span>{t("Название")}</span>
                     <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
                   </label>
                   <div className="icon-picker">
-                    <span className="label">Иконка</span>
-                    <button className="icon-button" title="Выбрать картинку" onClick={() => iconInput.current?.click()}>
+                    <span className="label">{t("Иконка")}</span>
+                    <button className="icon-button" title={t("Выбрать картинку")} onClick={() => iconInput.current?.click()}>
                       <InstanceCover instance={preview} large />
                     </button>
                     {draft.iconUrl && (
                       <button className="link small muted" onClick={() => setDraft({ ...draft, iconUrl: null })}>
-                        Убрать
+                        {t("Убрать")}
                       </button>
                     )}
                     <input
@@ -226,16 +230,16 @@ export default function InstanceSettingsModal(props: Props) {
                   </div>
                 </div>
 
-                <h4>Создание копии сборки</h4>
+                <h4>{t("Создание копии сборки")}</h4>
                 <button className="btn" disabled={busy} onClick={duplicate}>
-                  <Icon name="copy" /> Создать копию
+                  <Icon name="copy" /> {t("Создать копию")}
                 </button>
-                <p className="muted small">Создаёт копию сборки вместе с мирами, настройками и модами.</p>
+                <p className="muted small">{t("Создаёт копию сборки вместе с мирами, настройками и модами.")}</p>
 
-                <h4>Группировка</h4>
+                <h4>{t("Группировка")}</h4>
                 <input
                   list="instance-groups"
-                  placeholder="Введите название группы"
+                  placeholder={t("Введите название группы")}
                   value={s.group}
                   onChange={(e) => set("group", e.target.value)}
                 />
@@ -244,9 +248,9 @@ export default function InstanceSettingsModal(props: Props) {
                     <option key={g} value={g} />
                   ))}
                 </datalist>
-                <p className="muted small">Сборки с одинаковой группой показываются вместе в библиотеке.</p>
+                <p className="muted small">{t("Сборки с одинаковой группой показываются вместе в библиотеке.")}</p>
 
-                <h4>Канал обновлений модов</h4>
+                <h4>{t("Канал обновлений модов")}</h4>
                 <div className="chips">
                   {CHANNELS.map((c) => (
                     <button
@@ -254,23 +258,23 @@ export default function InstanceSettingsModal(props: Props) {
                       className={`chip ${s.updateChannel === c.value ? "on" : ""}`}
                       onClick={() => set("updateChannel", c.value)}
                     >
-                      {s.updateChannel === c.value && <Icon name="check" size={14} />} {c.label}
+                      {s.updateChannel === c.value && <Icon name="check" size={14} />} {t(c.label)}
                     </button>
                   ))}
                 </div>
-                <p className="muted small">{CHANNELS.find((c) => c.value === s.updateChannel)?.hint}</p>
+                <p className="muted small">{channelHint && t(channelHint)}</p>
 
-                <h4>Удаление сборки</h4>
+                <h4>{t("Удаление сборки")}</h4>
                 <button className="btn danger" disabled={busy} onClick={remove}>
-                  <Icon name="trash" /> Удалить сборку
+                  <Icon name="trash" /> {t("Удалить сборку")}
                 </button>
-                <p className="muted small">Миры, моды и настройки будут удалены без возможности восстановления.</p>
+                <p className="muted small">{t("Миры, моды и настройки будут удалены без возможности восстановления.")}</p>
               </>
             )}
 
             {section === "install" && (
               <>
-                <h4>Версия игры и загрузчик</h4>
+                <h4>{t("Версия игры и загрузчик")}</h4>
                 <div className="segmented">
                   {LOADERS.map((l) => (
                     <button
@@ -286,7 +290,7 @@ export default function InstanceSettingsModal(props: Props) {
                 </div>
                 <div className="row top section-gap">
                   <label className="field grow">
-                    <span>Версия Minecraft</span>
+                    <span>{t("Версия Minecraft")}</span>
                     <select value={draft.gameVersion} onChange={(e) => setDraft({ ...draft, gameVersion: e.target.value })}>
                       {!versions.some((v) => v.id === draft.gameVersion) && <option>{draft.gameVersion}</option>}
                       {versions
@@ -300,18 +304,18 @@ export default function InstanceSettingsModal(props: Props) {
                   </label>
                   {draft.loader.type !== "vanilla" && (
                     <label className="field grow">
-                      <span>Версия {LOADER_NAMES[draft.loader.type]}</span>
+                      <span>{t("Версия {loader}", { loader: LOADER_NAMES[draft.loader.type] })}</span>
                       <select
                         value={draft.loader.version}
                         onChange={(e) =>
                           setDraft({ ...draft, loader: { type: draft.loader.type, version: e.target.value } as Loader })
                         }
                       >
-                        {!loaderVersions.length && <option>{draft.loader.version || "Загрузка…"}</option>}
+                        {!loaderVersions.length && <option>{draft.loader.version || t("Загрузка…")}</option>}
                         {loaderVersions.map((l) => (
                           <option key={l.version} value={l.version}>
                             {l.version}
-                            {l.recommended ? " (рекомендуется)" : ""}
+                            {l.recommended ? ` (${t("рекомендуется")})` : ""}
                           </option>
                         ))}
                       </select>
@@ -320,17 +324,18 @@ export default function InstanceSettingsModal(props: Props) {
                 </div>
                 {(draft.gameVersion !== instance.gameVersion || draft.loader.type !== instance.loader.type) && (
                   <div className="warning-box">
-                    Установленные моды могут не подойти к новой версии или загрузчику. Проверьте их после смены.
+                    {t("Установленные моды могут не подойти к новой версии или загрузчику. Проверьте их после смены.")}
                   </div>
                 )}
 
-                <h4>Исправление сборки</h4>
+                <h4>{t("Исправление сборки")}</h4>
                 <button className="btn" disabled={busy} onClick={onRepair}>
-                  <Icon name="wrench" /> Исправить
+                  <Icon name="wrench" /> {t("Исправить")}
                 </button>
                 <p className="muted small">
-                  Переустанавливает загрузчик и файлы Minecraft и восстанавливает повреждённые. Помогает, если игра
-                  перестала запускаться из-за ошибок лаунчера. Миры и моды не трогаются.
+                  {t(
+                    "Переустанавливает загрузчик и файлы Minecraft и восстанавливает повреждённые. Помогает, если игра перестала запускаться из-за ошибок лаунчера. Миры и моды не трогаются.",
+                  )}
                 </p>
               </>
             )}
@@ -339,12 +344,12 @@ export default function InstanceSettingsModal(props: Props) {
               <>
                 <label className="checkbox">
                   <input type="checkbox" checked={s.fullscreen} onChange={(e) => set("fullscreen", e.target.checked)} />
-                  Полноэкранный режим
+                  {t("Полноэкранный режим")}
                 </label>
-                <h4>Размер окна</h4>
+                <h4>{t("Размер окна")}</h4>
                 <div className="row">
                   <label className="field grow">
-                    <span>Ширина</span>
+                    <span>{t("Ширина")}</span>
                     <input
                       inputMode="numeric"
                       placeholder="854"
@@ -354,7 +359,7 @@ export default function InstanceSettingsModal(props: Props) {
                     />
                   </label>
                   <label className="field grow">
-                    <span>Высота</span>
+                    <span>{t("Высота")}</span>
                     <input
                       inputMode="numeric"
                       placeholder="480"
@@ -364,9 +369,9 @@ export default function InstanceSettingsModal(props: Props) {
                     />
                   </label>
                 </div>
-                <p className="muted small">Пусто — размер по умолчанию. Нужно указать и ширину, и высоту.</p>
+                <p className="muted small">{t("Пусто — размер по умолчанию. Нужно указать и ширину, и высоту.")}</p>
 
-                <h4>Меню в игре</h4>
+                <h4>{t("Меню в игре")}</h4>
                 <div className="chips">
                   {GAME_UI.map((o) => (
                     <button
@@ -374,38 +379,38 @@ export default function InstanceSettingsModal(props: Props) {
                       className={`chip ${(s.gameUi ?? "") === o.value ? "on" : ""}`}
                       onClick={() => set("gameUi", o.value)}
                     >
-                      {(s.gameUi ?? "") === o.value && <Icon name="check" size={14} />} {o.label}
+                      {(s.gameUi ?? "") === o.value && <Icon name="check" size={14} />} {t(o.label)}
                     </button>
                   ))}
                 </div>
-                <p className="muted small">{GAME_UI.find((o) => o.value === (s.gameUi ?? ""))?.hint}</p>
+                <p className="muted small">{gameUiHint && t(gameUiHint)}</p>
               </>
             )}
 
             {section === "java" && (
               <>
-                <h4>Расположение Java</h4>
+                <h4>{t("Расположение Java")}</h4>
                 <div className="java-box">
                   <Icon name="coffee" />
                   <div className="grow">
                     <input
-                      placeholder="Автоматически: нужная версия скачается при запуске"
+                      placeholder={t("Автоматически: нужная версия скачается при запуске")}
                       value={s.javaPath}
                       onChange={(e) => set("javaPath", e.target.value)}
                     />
                     {javaCheck && <div className="small muted">{javaCheck}</div>}
                   </div>
                   <button className="btn" onClick={browseJava}>
-                    Обзор
+                    {t("Обзор")}
                   </button>
                   {s.javaPath && (
                     <button className="btn" onClick={() => checkJava()}>
-                      Проверить
+                      {t("Проверить")}
                     </button>
                   )}
                 </div>
 
-                <h4>Выделенная память</h4>
+                <h4>{t("Выделенная память")}</h4>
                 <div className="row">
                   <input
                     type="range"
@@ -422,20 +427,20 @@ export default function InstanceSettingsModal(props: Props) {
                     value={draft.memoryMb}
                     onChange={(e) => setDraft({ ...draft, memoryMb: Number(e.target.value.replace(/\D/g, "")) || 512 })}
                   />
-                  <span className="muted small">МБ</span>
+                  <span className="muted small">{t("МБ")}</span>
                 </div>
 
-                <h4>Аргументы Java</h4>
+                <h4>{t("Аргументы Java")}</h4>
                 <input
-                  placeholder="Например: -XX:+UseG1GC -XX:MaxGCPauseMillis=50"
+                  placeholder={t("Например: -XX:+UseG1GC -XX:MaxGCPauseMillis=50")}
                   value={s.jvmArgs}
                   onChange={(e) => set("jvmArgs", e.target.value)}
                 />
 
-                <h4>Переменные среды</h4>
+                <h4>{t("Переменные среды")}</h4>
                 <textarea
                   rows={3}
-                  placeholder={"По одной на строку: ИМЯ=значение"}
+                  placeholder={t("По одной на строку: ИМЯ=значение")}
                   value={s.envVars}
                   onChange={(e) => set("envVars", e.target.value)}
                 />
@@ -445,26 +450,26 @@ export default function InstanceSettingsModal(props: Props) {
             {section === "hooks" && (
               <>
                 <p className="muted small">
-                  Команды выполняются в папке игры через командную строку Windows. Пустое поле — ничего не делать.
+                  {t("Команды выполняются в папке игры через командную строку Windows. Пустое поле — ничего не делать.")}
                 </p>
-                <h4>Перед запуском</h4>
+                <h4>{t("Перед запуском")}</h4>
                 <input
-                  placeholder="Например: backup.bat"
+                  placeholder={t("Например: backup.bat")}
                   value={s.preLaunch}
                   onChange={(e) => set("preLaunch", e.target.value)}
                 />
-                <p className="muted small">Если команда завершится с ошибкой, игра не запустится.</p>
+                <p className="muted small">{t("Если команда завершится с ошибкой, игра не запустится.")}</p>
 
-                <h4>Обёртка</h4>
+                <h4>{t("Обёртка")}</h4>
                 <input
-                  placeholder="Программа, через которую запускается Java"
+                  placeholder={t("Программа, через которую запускается Java")}
                   value={s.wrapper}
                   onChange={(e) => set("wrapper", e.target.value)}
                 />
 
-                <h4>После выхода</h4>
+                <h4>{t("После выхода")}</h4>
                 <input
-                  placeholder="Например: shutdown /s"
+                  placeholder={t("Например: shutdown /s")}
                   value={s.postExit}
                   onChange={(e) => set("postExit", e.target.value)}
                 />
@@ -475,10 +480,10 @@ export default function InstanceSettingsModal(props: Props) {
 
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t("Отмена")}
           </button>
           <button className="btn primary" disabled={!dirty || saving || busy || !draft.name.trim()} onClick={save}>
-            Сохранить
+            {t("Сохранить")}
           </button>
         </div>
       </div>

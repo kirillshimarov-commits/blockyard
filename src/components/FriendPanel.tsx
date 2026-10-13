@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, errorText, Instance, LinkInfo, TunnelStatus } from "../api";
+import { t } from "../i18n";
 import { Icon } from "./Icon";
 
 interface Props {
@@ -11,8 +12,8 @@ interface Props {
 }
 
 export function linkLabel(link: LinkInfo): string {
-  const ping = link.rttMs != null ? `${link.rttMs} мс` : "…";
-  return link.relayed ? `${ping} · через сервер` : `${ping} · напрямую`;
+  const ping = link.rttMs != null ? t("{n} мс", { n: link.rttMs }) : "…";
+  return link.relayed ? t("{ping} · через сервер", { ping }) : t("{ping} · напрямую", { ping });
 }
 
 /** Host side of "play with a friend": shown while the game runs. */
@@ -28,7 +29,7 @@ export default function FriendPanel({ instance, running, tunnel, onTunnelChanged
     try {
       const code = await api.tunnelInvite(instance.id);
       await navigator.clipboard.writeText(code).catch(() => {});
-      notify("Код-приглашение скопирован — отправьте его другу");
+      notify(t("Код-приглашение скопирован — отправьте его другу"));
       onTunnelChanged();
     } catch (e) {
       notify(errorText(e), true);
@@ -47,7 +48,8 @@ export default function FriendPanel({ instance, running, tunnel, onTunnelChanged
       <div className="friend-panel muted">
         <Icon name="users" />
         <span>
-          Чтобы позвать друга: в игре нажмите <b>Esc → «Открыть для сети»</b>, и здесь появится кнопка приглашения.
+          {t("Чтобы позвать друга: в игре нажмите")} <b>{t("Esc → «Открыть для сети»")}</b>
+          {t(", и здесь появится кнопка приглашения.")}
         </span>
       </div>
     );
@@ -57,9 +59,9 @@ export default function FriendPanel({ instance, running, tunnel, onTunnelChanged
     return (
       <div className="friend-panel">
         <Icon name="users" />
-        <span className="grow">Мир открыт для сети. Позовите друга — ему понадобится только код.</span>
+        <span className="grow">{t("Мир открыт для сети. Позовите друга — ему понадобится только код.")}</span>
         <button className="btn primary" disabled={busy} onClick={invite}>
-          {busy ? <span className="spinner" /> : <Icon name="share" />} Пригласить друга
+          {busy ? <span className="spinner" /> : <Icon name="share" />} {t("Пригласить друга")}
         </button>
       </div>
     );
@@ -69,34 +71,35 @@ export default function FriendPanel({ instance, running, tunnel, onTunnelChanged
     <div className="friend-panel column">
       <div className="row between">
         <strong>
-          <Icon name="users" /> Друзья могут подключаться
+          <Icon name="users" /> {t("Друзья могут подключаться")}
         </strong>
         <button className="btn small-btn" onClick={stop}>
-          Остановить
+          {t("Остановить")}
         </button>
       </div>
       <div className="invite-code">
         <code className="truncate">{host.invite}</code>
         <button
           className="btn small-btn"
-          onClick={() => navigator.clipboard.writeText(host.invite).then(() => notify("Код скопирован"))}
+          onClick={() => navigator.clipboard.writeText(host.invite).then(() => notify(t("Код скопирован")))}
         >
-          <Icon name="copy" size={14} /> Копировать
+          <Icon name="copy" size={14} /> {t("Копировать")}
         </button>
       </div>
       <p className="muted small">
-        Друг вставляет код в Blockyard → «Подключиться к другу». Код действует, пока открыт мир.
+        {t("Друг вставляет код в Blockyard → «Подключиться к другу». Код действует, пока открыт мир.")}
       </p>
       {host.peers.length > 0 ? (
         <div className="peers">
           {host.peers.map((p) => (
             <span key={p.id} className="tag">
-              <span className="instance-dot" data-state="running" /> Игрок {p.id.slice(0, 4)} · {linkLabel(p)}
+              <span className="instance-dot" data-state="running" /> {t("Игрок {id}", { id: p.id.slice(0, 4) })} ·{" "}
+              {linkLabel(p)}
             </span>
           ))}
         </div>
       ) : (
-        <p className="muted small">Пока никто не подключился.</p>
+        <p className="muted small">{t("Пока никто не подключился.")}</p>
       )}
     </div>
   );

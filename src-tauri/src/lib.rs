@@ -228,7 +228,8 @@ async fn start_game(app: AppHandle, id: String, running: &Running, join_port: Op
             let running = app2.state::<Running>();
             let mut map = running.0.lock().unwrap();
             map.remove(&inst.id);
-            map.is_empty()
+            let empty = map.is_empty();
+            empty
         };
         if none_left {
             launcher::discord::set(None);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, errorText, Instance, ModUpdate } from "../api";
+import { t } from "../i18n";
 
 interface Props {
   instance: Instance;
@@ -37,7 +38,7 @@ export default function UpdatesModal({ instance, onChanged, onClose, notify }: P
     setBusy(true);
     try {
       onChanged(await api.applyModUpdates(instance.id, [...selected]));
-      notify(`Обновлено модов: ${selected.size}`);
+      notify(t("Обновлено модов: {n}", { n: selected.size }));
       onClose();
     } catch (e) {
       setError(errorText(e));
@@ -48,14 +49,14 @@ export default function UpdatesModal({ instance, onChanged, onClose, notify }: P
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Обновления модов</h2>
+        <h2>{t("Обновления модов")}</h2>
         {error && <div className="error-box">{error}</div>}
         {!updates && !error && (
           <div className="row gap-sm muted">
-            <span className="spinner" /> Проверяю {instance.mods.length} модов…
+            <span className="spinner" /> {t("Проверяю {n} модов…", { n: instance.mods.length })}
           </div>
         )}
-        {updates && updates.length === 0 && <p className="muted">Все моды последней версии 🎉</p>}
+        {updates && updates.length === 0 && <p className="muted">{t("Все моды последней версии 🎉")}</p>}
         {updates && updates.length > 0 && (
           <div className="mod-list pending-list">
             {updates.map((u) => (
@@ -73,12 +74,12 @@ export default function UpdatesModal({ instance, onChanged, onClose, notify }: P
         )}
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>
-            {updates?.length ? "Отмена" : "Закрыть"}
+            {updates?.length ? t("Отмена") : t("Закрыть")}
           </button>
           {updates && updates.length > 0 && (
             <button className="btn primary" disabled={busy || selected.size === 0} onClick={apply}>
               {busy ? <span className="spinner" /> : null}
-              Обновить ({selected.size})
+              {t("Обновить ({n})", { n: selected.size })}
             </button>
           )}
         </div>

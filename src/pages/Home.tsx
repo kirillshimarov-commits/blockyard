@@ -7,6 +7,7 @@ import { Icon } from "../components/Icon";
 import InstanceCover from "../components/InstanceCover";
 import HomeShelf from "../components/HomeShelf";
 import { sounds } from "../sounds";
+import { locale, t, tStage } from "../i18n";
 
 interface Props {
   instances: Instance[];
@@ -25,11 +26,11 @@ interface Props {
 const SELECTED_KEY = "home.selected";
 
 function lastPlayedLabel(ts?: number | null): string {
-  if (!ts) return "Ещё не запускалась";
+  if (!ts) return t("Ещё не запускалась");
   const days = Math.floor((Date.now() / 1000 - ts) / 86400);
-  if (days <= 0) return "Играли сегодня";
-  if (days === 1) return "Играли вчера";
-  return `Играли ${new Date(ts * 1000).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`;
+  if (days <= 0) return t("Играли сегодня");
+  if (days === 1) return t("Играли вчера");
+  return t("Играли {date}", { date: new Date(ts * 1000).toLocaleDateString(locale(), { day: "numeric", month: "long" }) });
 }
 
 /** Console-style home: a row of tiles and a large card for the selected instance. */
@@ -71,7 +72,7 @@ export default function Home(props: Props) {
 
   function play(inst: Instance) {
     if (inst.pending.length > 0) {
-      notify(`В сборке не хватает модов (${inst.pending.length}) — скачайте их перед игрой`, true);
+      notify(t("В сборке не хватает модов ({n}) — скачайте их перед игрой", { n: inst.pending.length }), true);
       onOpen(inst.id);
     } else {
       onPlay(inst.id);
@@ -108,11 +109,11 @@ export default function Home(props: Props) {
     try {
       const path = await open({
         multiple: false,
-        filters: [{ name: "Модпак (.mrpack, CurseForge .zip)", extensions: ["mrpack", "zip"] }],
+        filters: [{ name: t("Модпак (.mrpack, CurseForge .zip)"), extensions: ["mrpack", "zip"] }],
       });
       if (typeof path !== "string") return;
       const inst = await api.importModpack(path);
-      notify(`Импортирую «${inst.name}»…`);
+      notify(t("Импортирую «{name}»…", { name: inst.name }));
       onCreated(inst);
       select(inst.id);
     } catch (e) {
@@ -135,33 +136,33 @@ export default function Home(props: Props) {
     return (
       <div className="home home-welcome">
         <h1 className="welcome-title">
-          Добро пожаловать в <span className="accent-text">Blockyard</span>
+          {t("Добро пожаловать в")} <span className="accent-text">Blockyard</span>
         </h1>
-        <p className="welcome-sub">Во что сегодня играем?</p>
+        <p className="welcome-sub">{t("Во что сегодня играем?")}</p>
         <div className="orbs">
           <button className="orb" onClick={() => setCreating(true)}>
             <span className="orb-icon">
               <Icon name="plus" size={26} />
             </span>
-            <span className="orb-label">Новая сборка</span>
+            <span className="orb-label">{t("Новая сборка")}</span>
           </button>
           <button className="orb" onClick={onBrowseModpacks}>
             <span className="orb-icon">
               <Icon name="layers" size={26} />
             </span>
-            <span className="orb-label">Готовые сборки</span>
+            <span className="orb-label">{t("Готовые сборки")}</span>
           </button>
           <button className="orb" onClick={onJoinFriend}>
             <span className="orb-icon">
               <Icon name="users" size={26} />
             </span>
-            <span className="orb-label">Сетевая игра</span>
+            <span className="orb-label">{t("Сетевая игра")}</span>
           </button>
           <button className="orb" onClick={importPack}>
             <span className="orb-icon">
               <Icon name="upload" size={26} />
             </span>
-            <span className="orb-label">Импорт</span>
+            <span className="orb-label">{t("Импорт")}</span>
           </button>
         </div>
         {createModal}
@@ -177,7 +178,7 @@ export default function Home(props: Props) {
         {selected.iconUrl ? <img src={selected.iconUrl} alt="" /> : <span>{selected.name.slice(0, 1).toUpperCase()}</span>}
       </div>
       <div className="tile-row" ref={row}>
-        <button className="tile tile-action" title="Сетевая игра: зайти в мир друга" onClick={onJoinFriend}>
+        <button className="tile tile-action" title={t("Сетевая игра: зайти в мир друга")} onClick={onJoinFriend}>
           <Icon name="users" size={26} />
         </button>
         {sorted.map((inst, i) => (
@@ -196,7 +197,7 @@ export default function Home(props: Props) {
             )}
           </button>
         ))}
-        <button className="tile tile-add" title="Новая сборка" onClick={() => setCreating(true)}>
+        <button className="tile tile-add" title={t("Новая сборка")} onClick={() => setCreating(true)}>
           <Icon name="plus" size={24} />
         </button>
       </div>
@@ -215,20 +216,24 @@ export default function Home(props: Props) {
           <div className="hero-chips">
             <span className="chip">
               <span className="dot" data-state={state} />
-              {state === "running" ? "Игра запущена" : state === "installing" ? "Запуск…" : lastPlayedLabel(selected.lastPlayed)}
+              {state === "running" ? t("Игра запущена") : state === "installing" ? t("Запуск…") : lastPlayedLabel(selected.lastPlayed)}
             </span>
             {formatPlayTime(selected.playSeconds) && (
-              <span className="chip" title="Сколько времени вы провели в этой сборке">
+              <span className="chip" title={t("Сколько времени вы провели в этой сборке")}>
                 <Icon name="clock" size={13} /> {formatPlayTime(selected.playSeconds)}
               </span>
             )}
-            <span className="chip">{selected.mods.length ? `${selected.mods.length} модов` : "Без модов"}</span>
-            {selected.shaders.length > 0 && <span className="chip">Шейдеры: {selected.shaders.length}</span>}
-            {selected.pending.length > 0 && <span className="chip warn">Скачать вручную: {selected.pending.length}</span>}
+            <span className="chip">
+              {selected.mods.length ? t("{n} модов", { n: selected.mods.length }) : t("Без модов")}
+            </span>
+            {selected.shaders.length > 0 && <span className="chip">{t("Шейдеры: {n}", { n: selected.shaders.length })}</span>}
+            {selected.pending.length > 0 && (
+              <span className="chip warn">{t("Скачать вручную: {n}", { n: selected.pending.length })}</span>
+            )}
           </div>
           {state === "installing" && progress && (
             <div className="hero-progress">
-              <div className="muted small truncate">{progress.stage}</div>
+              <div className="muted small truncate">{tStage(progress.stage)}</div>
               <div className="bar">
                 <div style={{ width: `${progress.total ? (progress.current / progress.total) * 100 : 0}%` }} />
               </div>
@@ -238,17 +243,17 @@ export default function Home(props: Props) {
           <div className="hero-actions">
             {state === "running" ? (
               <button className="pill-btn" onClick={() => onStop(selected.id)}>
-                Остановить <Icon name="stop" size={16} />
+                {t("Остановить")} <Icon name="stop" size={16} />
               </button>
             ) : (
               <button className="pill-btn" disabled={state !== "stopped"} onClick={() => play(selected)}>
                 {state === "installing" ? (
                   <>
-                    Запуск <span className="spinner" />
+                    {t("Запуск")} <span className="spinner" />
                   </>
                 ) : (
                   <>
-                    Играть <Icon name="play" size={16} />
+                    {t("Играть")} <Icon name="play" size={16} />
                   </>
                 )}
               </button>
@@ -256,7 +261,7 @@ export default function Home(props: Props) {
             <div className="menu-anchor">
               <button
                 className="round-btn"
-                title="Ещё"
+                title={t("Ещё")}
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenu((m) => !m);
@@ -267,13 +272,13 @@ export default function Home(props: Props) {
               {menu && (
                 <div className="pop-menu" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => onOpen(selected.id)}>
-                    <Icon name="puzzle" /> Моды и настройки сборки
+                    <Icon name="puzzle" /> {t("Моды и настройки сборки")}
                   </button>
                   <button onClick={onJoinFriend}>
-                    <Icon name="users" /> Подключиться к другу
+                    <Icon name="users" /> {t("Подключиться к другу")}
                   </button>
                   <button onClick={importPack}>
-                    <Icon name="upload" /> Импорт модпака
+                    <Icon name="upload" /> {t("Импорт модпака")}
                   </button>
                   <button
                     onClick={() => {
@@ -281,14 +286,14 @@ export default function Home(props: Props) {
                       setCreating(true);
                     }}
                   >
-                    <Icon name="plus" /> Новая сборка
+                    <Icon name="plus" /> {t("Новая сборка")}
                   </button>
                 </div>
               )}
             </div>
           </div>
         </div>
-        <div className="hero-art" onClick={() => onOpen(selected.id)} title="Открыть сборку">
+        <div className="hero-art" onClick={() => onOpen(selected.id)} title={t("Открыть сборку")}>
           <InstanceCover instance={selected} large />
         </div>
       </section>

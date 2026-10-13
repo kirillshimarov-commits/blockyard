@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, BisectStatus, errorText, Instance } from "../api";
+import { t } from "../i18n";
 import { Icon } from "./Icon";
 
 interface Props {
@@ -37,7 +38,11 @@ export default function BisectPanel({ instance, status, running, onStatus, onCha
     act(async () => {
       onChanged(await api.bisectFinish(instance.id, disableCulprit));
       onStatus(null);
-      notify(disableCulprit && status.culprit ? `«${status.culprit.title}» выключен, остальные моды на месте` : "Моды вернулись как были");
+      notify(
+        disableCulprit && status.culprit
+          ? t("«{name}» выключен, остальные моды на месте", { name: status.culprit.title })
+          : t("Моды вернулись как были"),
+      );
     });
 
   if (status.culprit) {
@@ -45,17 +50,18 @@ export default function BisectPanel({ instance, status, running, onStatus, onCha
       <div className="bisect-panel done">
         <Icon name="bug" size={22} />
         <div className="grow">
-          <strong>Похоже, вылет вызывает «{status.culprit.title}»</strong>
+          <strong>{t("Похоже, вылет вызывает «{name}»", { name: status.culprit.title })}</strong>
           <p className="muted small">
-            С ним игра вылетала, без него запускалась. Моды уже вернулись как были. Можно выключить этот мод или
-            поискать его обновление.
+            {t(
+              "С ним игра вылетала, без него запускалась. Моды уже вернулись как были. Можно выключить этот мод или поискать его обновление.",
+            )}
           </p>
         </div>
         <button className="btn primary" disabled={busy} onClick={() => finish(true)}>
-          Выключить его
+          {t("Выключить его")}
         </button>
         <button className="btn" disabled={busy} onClick={() => finish(false)}>
-          Оставить как есть
+          {t("Оставить как есть")}
         </button>
       </div>
     );
@@ -66,14 +72,15 @@ export default function BisectPanel({ instance, status, running, onStatus, onCha
       <div className="bisect-panel done">
         <Icon name="bug" size={22} />
         <div className="grow">
-          <strong>Виновника найти не удалось</strong>
+          <strong>{t("Виновника найти не удалось")}</strong>
           <p className="muted small">
-            Игра не вылетала ни с одной половиной модов. Скорее всего, вылет вызывают два мода вместе или он случается
-            не каждый раз. Моды уже вернулись как были.
+            {t(
+              "Игра не вылетала ни с одной половиной модов. Скорее всего, вылет вызывают два мода вместе или он случается не каждый раз. Моды уже вернулись как были.",
+            )}
           </p>
         </div>
         <button className="btn" disabled={busy} onClick={() => finish(false)}>
-          Понятно
+          {t("Понятно")}
         </button>
       </div>
     );
@@ -84,11 +91,16 @@ export default function BisectPanel({ instance, status, running, onStatus, onCha
       <Icon name="bug" size={22} />
       <div className="grow">
         <strong>
-          Поиск мода, из-за которого вылет · шаг {status.step + 1}, осталось около {status.stepsLeft}
+          {t("Поиск мода, из-за которого вылет · шаг {step}, осталось около {left}", {
+            step: status.step + 1,
+            left: status.stepsLeft,
+          })}
         </strong>
         <p className="muted small">
-          Включено {status.enabled} из {status.total} модов, под подозрением {status.suspects}. Запустите игру и сделайте
-          то же, после чего она вылетала. Вылет лаунчер заметит сам, а если всё работает, просто закройте игру.
+          {t(
+            "Включено {enabled} из {total} модов, под подозрением {suspects}. Запустите игру и сделайте то же, после чего она вылетала. Вылет лаунчер заметит сам, а если всё работает, просто закройте игру.",
+            { enabled: status.enabled, total: status.total, suspects: status.suspects },
+          )}
         </p>
         <div className="bisect-bar">
           <div style={{ width: `${Math.max(6, (1 - status.suspects / Math.max(1, status.total)) * 100)}%` }} />
@@ -96,18 +108,28 @@ export default function BisectPanel({ instance, status, running, onStatus, onCha
       </div>
       <div className="bisect-actions">
         <button className="btn primary" disabled={busy || running} onClick={onPlay}>
-          <Icon name="play" /> Проверить
+          <Icon name="play" /> {t("Проверить")}
         </button>
         <div className="row gap-sm">
-          <button className="btn small-btn" disabled={busy || running} onClick={() => report(true)} title="Если игра вылетела, а лаунчер не заметил">
-            Вылетела
+          <button
+            className="btn small-btn"
+            disabled={busy || running}
+            onClick={() => report(true)}
+            title={t("Если игра вылетела, а лаунчер не заметил")}
+          >
+            {t("Вылетела")}
           </button>
-          <button className="btn small-btn" disabled={busy || running} onClick={() => report(false)} title="Если игра работала нормально">
-            Работает
+          <button
+            className="btn small-btn"
+            disabled={busy || running}
+            onClick={() => report(false)}
+            title={t("Если игра работала нормально")}
+          >
+            {t("Работает")}
           </button>
         </div>
         <button className="link small muted" disabled={busy || running} onClick={() => finish(false)}>
-          Отменить и вернуть моды
+          {t("Отменить и вернуть моды")}
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import IntroStars from "./IntroStars";
+import { t } from "../i18n";
 
 /**
  * Intro: the logo lights up and the greeting appears, then a big star rises, bursts into
@@ -24,9 +25,7 @@ export default function Splash({ name, onReveal, onDone }: { name: string; onRev
       <IntroStars running={phase !== "greet"} onReveal={handOver} onEnd={onDone} />
       <div className="splash-greet">
         <img className="splash-logo" src="/logo.svg" alt="" />
-        <div className="splash-title">
-          Добро пожаловать{name ? `, ${name}` : ""}
-        </div>
+        <div className="splash-title">{name ? t("Добро пожаловать, {name}", { name }) : t("Добро пожаловать")}</div>
         <div className="splash-sub">Blockyard</div>
       </div>
     </div>

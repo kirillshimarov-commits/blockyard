@@ -3,6 +3,7 @@ import { api, ContentKind, errorText, formatNumber, Instance, InstallResult, LOA
 import { Icon } from "../components/Icon";
 import ModPageModal, { type InstallState } from "../components/ModPageModal";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
+import { t } from "../i18n";
 
 interface Props {
   kind: ContentKind;
@@ -24,6 +25,7 @@ const SORTS: { value: string; label: string; sources: Source[] }[] = [
 
 const SOURCE_LABEL: Record<Source, string> = { modrinth: "Modrinth", curseforge: "CurseForge" };
 
+/** Russian texts; translated where they are shown. */
 const TEXT: Record<ContentKind, { title: string; subtitle: string; placeholder: string }> = {
   mod: { title: "Моды", subtitle: "Каталоги Modrinth и CurseForge", placeholder: "Поиск модов…" },
   shader: {
@@ -91,7 +93,7 @@ export default function Browse(props: Props) {
       setTotal(res.totalHits);
     } catch (e) {
       if (offset === 0) setHits([]);
-      setError(`Не удалось загрузить каталог: ${errorText(e)}`);
+      setError(t("Не удалось загрузить каталог: {error}", { error: errorText(e) }));
     } finally {
       setLoading(false);
     }
@@ -99,8 +101,8 @@ export default function Browse(props: Props) {
 
   // Debounced search when the query or filters change.
   useEffect(() => {
-    const t = window.setTimeout(() => load(0), 300);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => load(0), 300);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, sort, instanceId, source, kind]);
 
@@ -117,9 +119,9 @@ export default function Browse(props: Props) {
       return;
     }
     const count = res.installed.length;
-    if (count === 0) notify(`${title} уже есть в сборке`);
-    else if (count === 1) notify(`${title} установлен`);
-    else notify(`Установлено: ${res.installed.join(", ")}`);
+    if (count === 0) notify(t("{title} уже есть в сборке", { title }));
+    else if (count === 1) notify(t("{title} установлен", { title }));
+    else notify(t("Установлено: {list}", { list: res.installed.join(", ") }));
   }
 
   function stateOf(src: Source, projectId: string, title: string): InstallState {
@@ -136,7 +138,7 @@ export default function Browse(props: Props) {
     try {
       if (kind === "modpack") {
         const inst = await api.installModpack(hit.source, hit.projectId);
-        notify(`Устанавливаю «${hit.title}»…`);
+        notify(t("Устанавливаю «{name}»…", { name: hit.title }));
         onCreated(inst);
       } else if (instance) {
         const res =
@@ -160,13 +162,13 @@ export default function Browse(props: Props) {
     <div className="page">
       <header className="page-header">
         <div>
-          <h1>{text.title}</h1>
-          <p className="muted">{text.subtitle}</p>
+          <h1>{t(text.title)}</h1>
+          <p className="muted">{t(text.subtitle)}</p>
         </div>
         {needsTarget &&
           (targets.length > 0 ? (
             <label className="field inline">
-              <span>Ставить в:</span>
+              <span>{t("Ставить в:")}</span>
               <select value={instanceId} onChange={(e) => setInstanceId(e.target.value)}>
                 {targets.map((i) => (
                   <option key={i.id} value={i.id}>
@@ -177,7 +179,9 @@ export default function Browse(props: Props) {
             </label>
           ) : (
             <span className="hint">
-              {kind === "resourcepack" ? "Сначала создайте сборку" : "Создайте сборку с загрузчиком модов (Fabric, Forge…)"}
+              {kind === "resourcepack"
+                ? t("Сначала создайте сборку")
+                : t("Создайте сборку с загрузчиком модов (Fabric, Forge…)")}
             </span>
           ))}
       </header>
@@ -188,7 +192,7 @@ export default function Browse(props: Props) {
             key={s}
             className={source === s ? "on" : ""}
             disabled={s === "curseforge" && !curseforge}
-            title={s === "curseforge" && !curseforge ? "В этой сборке лаунчера нет ключа CurseForge" : undefined}
+            title={s === "curseforge" && !curseforge ? t("В этой сборке лаунчера нет ключа CurseForge") : undefined}
             onClick={() => switchSource(s)}
           >
             {SOURCE_LABEL[s]}
@@ -199,12 +203,12 @@ export default function Browse(props: Props) {
       <div className="search-bar">
         <div className="search-input">
           <Icon name="search" />
-          <input placeholder={text.placeholder} value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+          <input placeholder={t(text.placeholder)} value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
         </div>
         <select value={sort} onChange={(e) => setSort(e.target.value)}>
           {SORTS.filter((s) => s.sources.includes(source)).map((s) => (
             <option key={s.value} value={s.value}>
-              {s.label}
+              {t(s.label)}
             </option>
           ))}
         </select>
@@ -213,13 +217,16 @@ export default function Browse(props: Props) {
       <div className="row between">
         <p className="muted small">
           {kind === "mod" && instance
-            ? `Показаны моды для Minecraft ${instance.gameVersion} (${LOADER_NAMES[instance.loader.type]}). `
+            ? `${t("Показаны моды для Minecraft {version} ({loader}).", {
+                version: instance.gameVersion,
+                loader: LOADER_NAMES[instance.loader.type],
+              })} `
             : ""}
-          Найдено: {formatNumber(total)}
+          {t("Найдено: {n}", { n: formatNumber(total) })}
         </p>
         {instance && instance.pending.length > 0 && (
           <button className="btn" onClick={() => setShowPending(true)}>
-            Ждут скачивания: {instance.pending.length}
+            {t("Ждут скачивания: {n}", { n: instance.pending.length })}
           </button>
         )}
       </div>
@@ -234,15 +241,15 @@ export default function Browse(props: Props) {
           const canInstall = kind === "modpack" || !!instance;
           return (
             <div key={key} className="mod-card">
-              <button className="mod-card-icon" title="Подробнее" onClick={() => setOpened(hit)}>
+              <button className="mod-card-icon" title={t("Подробнее")} onClick={() => setOpened(hit)}>
                 {hit.iconUrl ? <img src={hit.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
               </button>
               <div className="grow">
                 <div className="row gap-sm">
-                  <button className="link mod-title" title="Подробнее" onClick={() => setOpened(hit)}>
+                  <button className="link mod-title" title={t("Подробнее")} onClick={() => setOpened(hit)}>
                     {hit.title}
                   </button>
-                  {hit.author && <span className="muted small">от {hit.author}</span>}
+                  {hit.author && <span className="muted small">{t("от {author}", { author: hit.author })}</span>}
                 </div>
                 <p className="mod-desc">{hit.description}</p>
                 <div className="tags">
@@ -259,16 +266,16 @@ export default function Browse(props: Props) {
               {canInstall &&
                 (isInstalled && instance ? (
                   <button className="btn" onClick={() => onOpenInstance(instance.id)}>
-                    <Icon name="check" /> Установлен
+                    <Icon name="check" /> {t("Установлен")}
                   </button>
                 ) : isPending ? (
                   <button className="btn" onClick={() => setShowPending(true)}>
-                    Скачать вручную
+                    {t("Скачать вручную")}
                   </button>
                 ) : (
                   <button className="btn primary" disabled={isInstalling} onClick={() => install(hit)}>
                     {isInstalling ? <span className="spinner" /> : <Icon name="download" />}
-                    {isInstalling ? "Установка…" : "Установить"}
+                    {isInstalling ? t("Установка…") : t("Установить")}
                   </button>
                 ))}
             </div>
@@ -276,15 +283,15 @@ export default function Browse(props: Props) {
         })}
       </div>
 
-      {loading && <div className="center muted">Загрузка…</div>}
+      {loading && <div className="center muted">{t("Загрузка…")}</div>}
       {!loading && hits.length > 0 && hits.length < total && (
         <div className="center">
           <button className="btn" onClick={() => load(hits.length)}>
-            Показать ещё
+            {t("Показать ещё")}
           </button>
         </div>
       )}
-      {!loading && !error && hits.length === 0 && <div className="center muted">Ничего не найдено</div>}
+      {!loading && !error && hits.length === 0 && <div className="center muted">{t("Ничего не найдено")}</div>}
 
       {opened && (
         <ModPageModal

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, Instance } from "../api";
+import { t } from "../i18n";
 import { Icon } from "./Icon";
 
 interface Props {
@@ -32,15 +33,14 @@ export default function PendingDownloadsModal({ instance, onChanged, onClose, on
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>{pending.length ? "Нужно скачать вручную" : "Готово!"}</h2>
+        <h2>{pending.length ? t("Нужно скачать вручную") : t("Готово!")}</h2>
         {pending.length > 0 ? (
           <>
-            {onPlay && (
-              <div className="warning-box">Без этих модов игра, скорее всего, вылетит.</div>
-            )}
+            {onPlay && <div className="warning-box">{t("Без этих модов игра, скорее всего, вылетит.")}</div>}
             <p className="muted">
-              Авторы этих модов запретили скачивание через лаунчеры. Нажмите «Скачать» и сохраните файл в папку
-              «Загрузки», а лаунчер сам перенесёт его в сборку.
+              {t(
+                "Авторы этих модов запретили скачивание через лаунчеры. Нажмите «Скачать» и сохраните файл в папку «Загрузки», а лаунчер сам перенесёт его в сборку.",
+              )}
             </p>
             <div className="mod-list pending-list">
               {pending.map((p) => (
@@ -51,31 +51,31 @@ export default function PendingDownloadsModal({ instance, onChanged, onClose, on
                     <div className="muted small truncate">{p.fileName}</div>
                   </div>
                   <button className="btn primary" onClick={() => openUrl(p.pageUrl)}>
-                    <Icon name="download" /> Скачать
+                    <Icon name="download" /> {t("Скачать")}
                   </button>
                 </div>
               ))}
             </div>
             <div className="row gap-sm muted small">
-              <span className="spinner" /> Ждём файлы в папке «Загрузки»…
+              <span className="spinner" /> {t("Ждём файлы в папке «Загрузки»…")}
             </div>
           </>
         ) : (
-          <p className="muted">Все моды перенесены в сборку.</p>
+          <p className="muted">{t("Все моды перенесены в сборку.")}</p>
         )}
         <div className="modal-actions">
           {onPlay ? (
             <>
               <button className="btn" onClick={onClose}>
-                Отмена
+                {t("Отмена")}
               </button>
               <button className={`btn ${pending.length ? "danger" : "primary"}`} onClick={onPlay}>
-                {pending.length ? "Играть без них" : "Играть"}
+                {pending.length ? t("Играть без них") : t("Играть")}
               </button>
             </>
           ) : (
             <button className={`btn ${pending.length ? "" : "primary"}`} onClick={onClose}>
-              {pending.length ? "Скачаю позже" : "Закрыть"}
+              {pending.length ? t("Скачаю позже") : t("Закрыть")}
             </button>
           )}
         </div>

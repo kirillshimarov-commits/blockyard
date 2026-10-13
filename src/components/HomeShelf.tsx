@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ContentKind, errorText, formatNumber, Instance, ModHit, News } from "../api";
 import { Icon } from "./Icon";
+import { t } from "../i18n";
 
 interface Props {
   instance: Instance;
@@ -73,8 +74,8 @@ export default function HomeShelf({ instance, onOpen, onBrowse, onChanged, notif
           ? await api.installMod(instance.id, hit.source, hit.projectId)
           : await api.installAsset(instance.id, hit.source, hit.projectId, "resourcepack");
       onChanged(res.instance);
-      if (res.pending.length) notify(`«${hit.title}» нужно скачать вручную — откройте сборку`, true);
-      else notify(`Установлено: ${res.installed.join(", ") || hit.title}`);
+      if (res.pending.length) notify(t("«{title}» нужно скачать вручную — откройте сборку", { title: hit.title }), true);
+      else notify(t("Установлено: {list}", { list: res.installed.join(", ") || hit.title }));
     } catch (e) {
       notify(errorText(e), true);
     } finally {
@@ -90,14 +91,14 @@ export default function HomeShelf({ instance, onOpen, onBrowse, onChanged, notif
     <div className="shelf">
       <section className="shelf-card">
         <header>
-          <span>{vanilla ? "Ресурспаки в сборке" : "Моды в сборке"}</span>
+          <span>{vanilla ? t("Ресурспаки в сборке") : t("Моды в сборке")}</span>
           <span className="muted">{installedList.length}</span>
         </header>
         {installedList.length === 0 ? (
           <div className="shelf-empty">
-            <span className="muted">{vanilla ? "Ресурспаков пока нет" : "Модов пока нет"}</span>
+            <span className="muted">{vanilla ? t("Ресурспаков пока нет") : t("Модов пока нет")}</span>
             <button className="btn small-btn" onClick={() => onBrowse(kind)}>
-              <Icon name="plus" size={14} /> Добавить
+              <Icon name="plus" size={14} /> {t("Добавить")}
             </button>
           </div>
         ) : (
@@ -106,19 +107,20 @@ export default function HomeShelf({ instance, onOpen, onBrowse, onChanged, notif
               <li key={m.projectId} className={m.disabled ? "off" : ""}>
                 <ModIcon url={m.iconUrl} title={m.title} />
                 <span className="truncate">{m.title}</span>
-                {m.disabled && <span className="muted small">выкл.</span>}
+                {m.disabled && <span className="muted small">{t("выкл.")}</span>}
               </li>
             ))}
           </ul>
         )}
         <button className="shelf-more" onClick={onOpen}>
-          {installedList.length > 5 ? `Ещё ${installedList.length - 5}` : "Открыть сборку"} <Icon name="chevron" size={14} />
+          {installedList.length > 5 ? t("Ещё {n}", { n: installedList.length - 5 }) : t("Открыть сборку")}{" "}
+          <Icon name="chevron" size={14} />
         </button>
       </section>
 
       <section className="shelf-card">
         <header>
-          <span>Популярное для {instance.gameVersion}</span>
+          <span>{t("Популярное для {version}", { version: instance.gameVersion })}</span>
           <span className="muted">Modrinth</span>
         </header>
         {popular === null ? (
@@ -129,7 +131,7 @@ export default function HomeShelf({ instance, onOpen, onBrowse, onChanged, notif
           </ul>
         ) : suggestions.length === 0 ? (
           <div className="shelf-empty">
-            <span className="muted">{popular.length ? "Всё популярное уже стоит" : "Не удалось загрузить"}</span>
+            <span className="muted">{popular.length ? t("Всё популярное уже стоит") : t("Не удалось загрузить")}</span>
           </div>
         ) : (
           <ul className="shelf-list">
@@ -138,11 +140,11 @@ export default function HomeShelf({ instance, onOpen, onBrowse, onChanged, notif
                 <ModIcon url={h.iconUrl} title={h.title} />
                 <span className="grow">
                   <span className="truncate block">{h.title}</span>
-                  <span className="muted small">{formatNumber(h.downloads)} загрузок</span>
+                  <span className="muted small">{t("{n} загрузок", { n: formatNumber(h.downloads) })}</span>
                 </span>
                 <button
                   className="mini-add"
-                  title="Установить"
+                  title={t("Установить")}
                   disabled={installing !== null}
                   onClick={() => install(h)}
                 >
@@ -153,7 +155,7 @@ export default function HomeShelf({ instance, onOpen, onBrowse, onChanged, notif
           </ul>
         )}
         <button className="shelf-more" onClick={() => onBrowse(kind)}>
-          Весь каталог <Icon name="chevron" size={14} />
+          {t("Весь каталог")} <Icon name="chevron" size={14} />
         </button>
       </section>
 
@@ -162,8 +164,8 @@ export default function HomeShelf({ instance, onOpen, onBrowse, onChanged, notif
         style={featured?.image ? { backgroundImage: `url("${featured.image}")` } : undefined}
       >
         <header>
-          <span>Новое в Minecraft</span>
-          {featured && <span className="pill-tag">{featured.kind === "release" ? "релиз" : "снапшот"}</span>}
+          <span>{t("Новое в Minecraft")}</span>
+          {featured && <span className="pill-tag">{featured.kind === "release" ? t("релиз") : t("снапшот")}</span>}
         </header>
         {news === null ? (
           <div className="news-body">
@@ -172,14 +174,14 @@ export default function HomeShelf({ instance, onOpen, onBrowse, onChanged, notif
           </div>
         ) : !featured ? (
           <div className="shelf-empty">
-            <span className="muted">Новости сейчас недоступны</span>
+            <span className="muted">{t("Новости сейчас недоступны")}</span>
           </div>
         ) : (
           <div className="news-body">
             <div className="news-title">{featured.title}</div>
             {featured.text && <div className="news-text">{featured.text}</div>}
             {latest && latest !== featured && (
-              <div className="muted small">Свежий снапшот: {latest.version}</div>
+              <div className="muted small">{t("Свежий снапшот: {version}", { version: latest.version })}</div>
             )}
           </div>
         )}

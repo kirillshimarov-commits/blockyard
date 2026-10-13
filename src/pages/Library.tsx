@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { api, errorText, Instance, loaderLabel } from "../api";
+import { api, errorText, formatPlayTime, Instance, loaderLabel } from "../api";
+import { t } from "../i18n";
 import type { GameStatus } from "../App";
 import CreateInstanceModal from "../components/CreateInstanceModal";
 import { Icon } from "../components/Icon";
@@ -33,11 +34,11 @@ export default function Library({ instances, status, onOpen, onPlay, onJoinFrien
     try {
       const path = await open({
         multiple: false,
-        filters: [{ name: "Модпак (.mrpack, CurseForge .zip)", extensions: ["mrpack", "zip"] }],
+        filters: [{ name: t("Модпак (.mrpack, CurseForge .zip)"), extensions: ["mrpack", "zip"] }],
       });
       if (typeof path !== "string") return;
       const inst = await api.importModpack(path);
-      notify(`Импортирую «${inst.name}»…`);
+      notify(t("Импортирую «{name}»…", { name: inst.name }));
       onCreated(inst);
     } catch (e) {
       notify(errorText(e), true);
@@ -48,18 +49,18 @@ export default function Library({ instances, status, onOpen, onPlay, onJoinFrien
     <div className="page">
       <header className="page-header">
         <div>
-          <h1>Библиотека</h1>
-          <p className="muted">Ваши сборки Minecraft</p>
+          <h1>{t("Библиотека")}</h1>
+          <p className="muted">{t("Ваши сборки Minecraft")}</p>
         </div>
         <div className="row gap-sm">
-          <button className="btn" title="Зайти в мир друга по коду-приглашению" onClick={onJoinFriend}>
-            <Icon name="users" /> Подключиться к другу
+          <button className="btn" title={t("Зайти в мир друга по коду-приглашению")} onClick={onJoinFriend}>
+            <Icon name="users" /> {t("Подключиться к другу")}
           </button>
-          <button className="btn" title="Открыть .mrpack или модпак CurseForge из файла" onClick={importPack}>
-            <Icon name="upload" /> Импорт
+          <button className="btn" title={t("Открыть .mrpack или модпак CurseForge из файла")} onClick={importPack}>
+            <Icon name="upload" /> {t("Импорт")}
           </button>
           <button className="btn primary" onClick={() => setCreating(true)}>
-            <Icon name="plus" /> Новая сборка
+            <Icon name="plus" /> {t("Новая сборка")}
           </button>
         </div>
       </header>
@@ -67,16 +68,16 @@ export default function Library({ instances, status, onOpen, onPlay, onJoinFrien
       {instances.length === 0 ? (
         <div className="empty">
           <Icon name="box" size={48} />
-          <h3>Сборок пока нет</h3>
-          <p className="muted">Создайте первую сборку: выберите версию игры и Fabric, чтобы ставить моды.</p>
+          <h3>{t("Сборок пока нет")}</h3>
+          <p className="muted">{t("Создайте первую сборку: выберите версию игры и Fabric, чтобы ставить моды.")}</p>
           <button className="btn primary" onClick={() => setCreating(true)}>
-            <Icon name="plus" /> Создать сборку
+            <Icon name="plus" /> {t("Создать сборку")}
           </button>
         </div>
       ) : (
         groups.map(([group, list]) => (
           <section key={group} className="library-group">
-            {groups.length > 1 && <h3>{group || "Без группы"}</h3>}
+            {groups.length > 1 && <h3>{group || t("Без группы")}</h3>}
             <div className="instance-grid">
               {list.map((inst) => {
             const state = status[inst.id]?.state ?? "stopped";
@@ -90,20 +91,21 @@ export default function Library({ instances, status, onOpen, onPlay, onJoinFrien
                   </div>
                   <div className="muted small">
                     {status[inst.id]?.state === "installing"
-                      ? "Установка…"
+                      ? t("Установка…")
                       : inst.mods.length
-                        ? `${inst.mods.length} модов`
-                        : "Без модов"}
+                        ? t("{n} модов", { n: inst.mods.length })
+                        : t("Без модов")}
+                    {formatPlayTime(inst.playSeconds) && ` · ${formatPlayTime(inst.playSeconds)}`}
                   </div>
                 </div>
                 <button
                   className="play-fab"
                   disabled={state !== "stopped"}
-                  title="Играть"
+                  title={t("Играть")}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (inst.pending.length > 0) {
-                      notify(`В сборке не хватает модов (${inst.pending.length}) — скачайте их перед игрой`, true);
+                      notify(t("В сборке не хватает модов ({n}) — скачайте их перед игрой", { n: inst.pending.length }), true);
                       onOpen(inst.id);
                     } else {
                       onPlay(inst.id);

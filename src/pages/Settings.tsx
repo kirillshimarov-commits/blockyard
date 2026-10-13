@@ -3,6 +3,7 @@ import { Account, api, errorText, Settings } from "../api";
 import MicrosoftLoginModal from "../components/MicrosoftLoginModal";
 import { Icon } from "../components/Icon";
 import { sounds } from "../sounds";
+import { t } from "../i18n";
 import {
   ACCENTS,
   Appearance,
@@ -24,6 +25,7 @@ interface Props {
   notify: (text: string, error?: boolean) => void;
 }
 
+// Labels are Russian and translated where they are shown.
 const THEMES: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "Как в системе" },
   { value: "dark", label: "Тёмная" },
@@ -49,6 +51,12 @@ const BACKGROUNDS: { value: Background; label: string }[] = [
   { value: "image", label: "Картинка" },
 ];
 
+/** Each language is named in itself. */
+const LANGUAGES: { value: Appearance["language"]; label: string }[] = [
+  { value: "ru", label: "Русский" },
+  { value: "en", label: "English" },
+];
+
 const EFFECT_NAMES: Record<string, string> = {
   mica: "Mica",
   acrylic: "Acrylic",
@@ -60,16 +68,18 @@ function Segmented<T extends string>({
   options,
   value,
   onChange,
+  translate = true,
 }: {
   options: { value: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
+  translate?: boolean;
 }) {
   return (
     <div className="segmented">
       {options.map((o) => (
         <button key={o.value} className={value === o.value ? "on" : ""} onClick={() => onChange(o.value)}>
-          {o.label}
+          {translate ? t(o.label) : o.label}
         </button>
       ))}
     </div>
@@ -157,7 +167,7 @@ export default function SettingsPage(props: Props) {
       setLoggingIn(false);
       setAccounts(await api.listAccounts());
       onSaved({ ...settings, activeAccount: account.uuid });
-      notify(`Вы вошли как ${account.username}`);
+      notify(t("Вы вошли как {name}", { name: account.username }));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [settings],
@@ -179,7 +189,7 @@ export default function SettingsPage(props: Props) {
       };
       await api.saveSettings(next);
       onSaved(next);
-      notify("Настройки сохранены");
+      notify(t("Настройки сохранены"));
     } catch (e) {
       notify(errorText(e), true);
     }
@@ -199,12 +209,19 @@ export default function SettingsPage(props: Props) {
     <div className="page narrow">
       <header className="page-header">
         <div>
-          <h1>Настройки</h1>
+          <h1>{t("Настройки")}</h1>
         </div>
       </header>
 
       <section className="card">
-        <h3>Аккаунт</h3>
+        <h3>
+          <Icon name="globe" size={16} /> {t("Язык")} · Language
+        </h3>
+        <Segmented options={LANGUAGES} value={a.language} onChange={(v) => set("language", v)} translate={false} />
+      </section>
+
+      <section className="card">
+        <h3>{t("Аккаунт")}</h3>
         <div className="accounts">
           {accounts.map((acc) => (
             <label key={acc.uuid} className={`account-option ${settings.activeAccount === acc.uuid ? "on" : ""}`}>
@@ -217,9 +234,9 @@ export default function SettingsPage(props: Props) {
               <img src={`https://mc-heads.net/avatar/${acc.uuid}/32`} alt="" />
               <div className="grow">
                 <div className="mod-title">{acc.username}</div>
-                <div className="muted small">Microsoft · лицензия</div>
+                <div className="muted small">{t("Microsoft · лицензия")}</div>
               </div>
-              <button className="btn icon" title="Выйти" onClick={() => removeAccount(acc.uuid)}>
+              <button className="btn icon" title={t("Выйти")} onClick={() => removeAccount(acc.uuid)}>
                 <Icon name="trash" />
               </button>
             </label>
@@ -229,72 +246,58 @@ export default function SettingsPage(props: Props) {
             <div className="avatar">{settings.username.slice(0, 1).toUpperCase()}</div>
             <div className="grow">
               <div className="mod-title">{settings.username}</div>
-              <div className="muted small">Офлайн · серверы без проверки лицензии</div>
+              <div className="muted small">{t("Офлайн · серверы без проверки лицензии")}</div>
             </div>
           </label>
         </div>
         <button
           className="btn"
           disabled={!msAvailable}
-          title={msAvailable ? undefined : "В этой сборке лаунчера не настроен вход через Microsoft"}
+          title={msAvailable ? undefined : t("В этой сборке лаунчера не настроен вход через Microsoft")}
           onClick={() => setLoggingIn(true)}
         >
-          <Icon name="user" /> Войти через Microsoft
+          <Icon name="user" /> {t("Войти через Microsoft")}
         </button>
         {!msAvailable && (
-          <p className="muted small">Вход через Microsoft появится, когда в сборку добавят MS_CLIENT_ID.</p>
+          <p className="muted small">{t("Вход через Microsoft появится, когда в сборку добавят MS_CLIENT_ID.")}</p>
         )}
 
         <label className="field section-gap">
-          <span>Ник для офлайн-режима</span>
+          <span>{t("Ник для офлайн-режима")}</span>
           <input
             value={draft.username}
             maxLength={16}
             onChange={(e) => setDraft({ ...draft, username: e.target.value })}
           />
         </label>
-        {!valid && <div className="hint">От 3 до 16 символов: латинские буквы, цифры и _</div>}
+        {!valid && <div className="hint">{t("От 3 до 16 символов: латинские буквы, цифры и _")}</div>}
 
-        <h3 className="section-gap">Игра</h3>
+        <h3 className="section-gap">{t("Игра")}</h3>
         <label className="checkbox">
           <input
             type="checkbox"
             checked={settings.embedGame ?? true}
-            onChange={async (e) => {
-              const next = { ...settings, embedGame: e.target.checked };
-              try {
-                await api.saveSettings(next);
-                onSaved(next);
-              } catch (err) {
-                notify(errorText(err), true);
-              }
-            }}
+            onChange={(e) => saveToggle({ embedGame: e.target.checked })}
           />
-          Открывать игру внутри окна лаунчера
+          {t("Открывать игру внутри окна лаунчера")}
         </label>
         <p className="muted small">
-          Minecraft появляется прямо в лаунчере, без отдельного окна. Если вместо игры чёрный экран или не работает
-          мышь — выключите.
+          {t(
+            "Minecraft появляется прямо в лаунчере, без отдельного окна. Если вместо игры чёрный экран или не работает мышь — выключите.",
+          )}
         </p>
         <label className="checkbox">
           <input
             type="checkbox"
             checked={settings.gameUi ?? true}
-            onChange={async (e) => {
-              const next = { ...settings, gameUi: e.target.checked };
-              try {
-                await api.saveSettings(next);
-                onSaved(next);
-              } catch (err) {
-                notify(errorText(err), true);
-              }
-            }}
+            onChange={(e) => saveToggle({ gameUi: e.target.checked })}
           />
-          Меню игры в стиле Blockyard
+          {t("Меню игры в стиле Blockyard")}
         </label>
         <p className="muted small">
-          Мод Blockyard UI делает меню Minecraft как в лаунчере. Пока только для Fabric и Quilt 1.21.1, ставится в
-          такие сборки сам при запуске. Для отдельной сборки это меняется в её настройках → «Окно и меню».
+          {t(
+            "Мод Blockyard UI делает меню Minecraft как в лаунчере. Пока только для Fabric и Quilt 1.21.1, ставится в такие сборки сам при запуске. Для отдельной сборки это меняется в её настройках → «Окно и меню».",
+          )}
         </p>
         <label className="checkbox">
           <input
@@ -303,27 +306,27 @@ export default function SettingsPage(props: Props) {
             disabled={!discordAvailable}
             onChange={(e) => saveToggle({ discord: e.target.checked })}
           />
-          Показывать игру в профиле Discord
+          {t("Показывать игру в профиле Discord")}
         </label>
         <p className="muted small">
           {discordAvailable
-            ? "Пока идёт игра, друзья в Discord видят название сборки, версию и сколько вы уже играете."
-            : "Появится, когда в сборку лаунчера добавят DISCORD_CLIENT_ID."}
+            ? t("Пока идёт игра, друзья в Discord видят название сборки, версию и сколько вы уже играете.")
+            : t("Появится, когда в сборку лаунчера добавят DISCORD_CLIENT_ID.")}
         </p>
 
-        <h3 className="section-gap">Новые сборки</h3>
+        <h3 className="section-gap">{t("Новые сборки")}</h3>
         <Slider
-          label="Оперативная память по умолчанию"
+          label={t("Оперативная память по умолчанию")}
           value={draft.memoryMb}
           min={1024}
           max={16384}
           step={512}
-          suffix=" МБ"
+          suffix={` ${t("МБ")}`}
           onChange={(memoryMb) => setDraft({ ...draft, memoryMb })}
         />
         <div className="row end">
           <button className="btn primary" disabled={!valid || !dirty} onClick={save}>
-            Сохранить
+            {t("Сохранить")}
           </button>
         </div>
       </section>
@@ -332,48 +335,49 @@ export default function SettingsPage(props: Props) {
 
       <section className="card">
         <div className="row between">
-          <h3>Оформление</h3>
-          <button className="btn small-btn" onClick={() => onAppearanceChange(DEFAULT_APPEARANCE)}>
-            Сбросить
+          <h3>{t("Оформление")}</h3>
+          <button className="btn small-btn" onClick={() => onAppearanceChange({ ...DEFAULT_APPEARANCE, language: a.language })}>
+            {t("Сбросить")}
           </button>
         </div>
 
         <div className="field">
-          <span>Стиль интерфейса</span>
+          <span>{t("Стиль интерфейса")}</span>
           <Segmented options={LAYOUTS} value={a.layout} onChange={(v) => set("layout", v)} />
           <span className="muted small">
-            «Консоль» — главная с плитками сборок и большой карточкой, как на PS5. «Классический» — боковая панель.
+            {t("«Консоль» — главная с плитками сборок и большой карточкой, как на PS5. «Классический» — боковая панель.")}
           </span>
         </div>
         {a.layout === "console" && (
           <>
             <label className="checkbox">
               <input type="checkbox" checked={a.spaceScene} onChange={(e) => set("spaceScene", e.target.checked)} />
-              Космический фон со звёздами и лучами света
+              {t("Космический фон со звёздами и лучами света")}
             </label>
             <label className="checkbox">
               <input type="checkbox" checked={a.splash} onChange={(e) => set("splash", e.target.checked)} />
-              Заставка при запуске лаунчера
+              {t("Заставка при запуске лаунчера")}
             </label>
           </>
         )}
 
         <div className="field">
-          <span>Тема</span>
+          <span>{t("Тема")}</span>
           <Segmented options={THEMES} value={a.theme} onChange={(v) => set("theme", v)} />
         </div>
 
         <div className="field">
-          <span>Прозрачность окна</span>
+          <span>{t("Прозрачность окна")}</span>
           <Segmented options={EFFECTS} value={a.effect} onChange={(v) => set("effect", v)} />
           <span className="muted small">
-            Сейчас: {EFFECT_NAMES[activeEffect] ?? activeEffect}. Mica работает только в Windows 11, в Windows 10
-            вместо неё включается Acrylic.
+            {t("Сейчас: {effect}. Mica работает только в Windows 11, в Windows 10 вместо неё включается Acrylic.", {
+              effect: t(EFFECT_NAMES[activeEffect] ?? activeEffect),
+            })}
           </span>
         </div>
 
         <Slider
-          label="Плотность панелей"
+          label={t("Плотность панелей")}
           value={a.opacity}
           min={0}
           max={100}
@@ -382,7 +386,7 @@ export default function SettingsPage(props: Props) {
         />
 
         <div className="field">
-          <span>Цвет кнопок и акцентов</span>
+          <span>{t("Цвет кнопок и акцентов")}</span>
           <div className="swatches">
             {ACCENTS.map((c) => (
               <button
@@ -393,14 +397,14 @@ export default function SettingsPage(props: Props) {
                 onClick={() => set("accent", c)}
               />
             ))}
-            <label className="swatch custom" title="Свой цвет">
+            <label className="swatch custom" title={t("Свой цвет")}>
               <input type="color" value={a.accent} onChange={(e) => set("accent", e.target.value)} />
             </label>
           </div>
         </div>
 
         <div className="field">
-          <span>Фон</span>
+          <span>{t("Фон")}</span>
           <Segmented options={BACKGROUNDS} value={a.background} onChange={(v) => set("background", v)} />
         </div>
 
@@ -413,7 +417,7 @@ export default function SettingsPage(props: Props) {
                 style={{ background: g.css }}
                 onClick={() => set("gradient", key)}
               >
-                <span>{g.label}</span>
+                <span>{t(g.label)}</span>
               </button>
             ))}
           </div>
@@ -424,7 +428,7 @@ export default function SettingsPage(props: Props) {
             <div className="row">
               {a.backgroundImage && <img className="bg-preview" src={a.backgroundImage} alt="" />}
               <button className="btn" onClick={() => fileInput.current?.click()}>
-                {a.backgroundImage ? "Заменить картинку" : "Выбрать картинку"}
+                {a.backgroundImage ? t("Заменить картинку") : t("Выбрать картинку")}
               </button>
               <input
                 ref={fileInput}
@@ -434,30 +438,60 @@ export default function SettingsPage(props: Props) {
                 onChange={(e) => pickImage(e.target.files?.[0])}
               />
             </div>
-            <Slider label="Размытие фона" value={a.backgroundBlur} min={0} max={40} suffix=" px" onChange={(v) => set("backgroundBlur", v)} />
+            <Slider
+              label={t("Размытие фона")}
+              value={a.backgroundBlur}
+              min={0}
+              max={40}
+              suffix=" px"
+              onChange={(v) => set("backgroundBlur", v)}
+            />
           </>
         )}
         {a.background !== "window" && (
-          <Slider label="Затемнение фона" value={a.backgroundDim} min={0} max={80} suffix="%" onChange={(v) => set("backgroundDim", v)} />
+          <Slider
+            label={t("Затемнение фона")}
+            value={a.backgroundDim}
+            min={0}
+            max={80}
+            suffix="%"
+            onChange={(v) => set("backgroundDim", v)}
+          />
         )}
 
-        <Slider label="Скругление углов" value={a.radius} min={0} max={24} suffix=" px" onChange={(v) => set("radius", v)} />
-        <Slider label="Масштаб интерфейса" value={a.scale} min={85} max={125} step={5} suffix="%" onChange={(v) => set("scale", v)} />
+        <Slider label={t("Скругление углов")} value={a.radius} min={0} max={24} suffix=" px" onChange={(v) => set("radius", v)} />
+        <Slider
+          label={t("Масштаб интерфейса")}
+          value={a.scale}
+          min={85}
+          max={125}
+          step={5}
+          suffix="%"
+          onChange={(v) => set("scale", v)}
+        />
 
         <label className="checkbox">
           <input type="checkbox" checked={a.animations} onChange={(e) => set("animations", e.target.checked)} />
-          Анимации
+          {t("Анимации")}
         </label>
         <label className="checkbox">
           <input type="checkbox" checked={a.sounds} onChange={(e) => set("sounds", e.target.checked)} />
-          Звуки интерфейса
+          {t("Звуки интерфейса")}
         </label>
         {a.sounds && (
           <div className="row gap-sm">
             <div className="grow">
-              <Slider label="Громкость звуков" value={a.soundVolume} min={5} max={100} step={5} suffix="%" onChange={(v) => set("soundVolume", v)} />
+              <Slider
+                label={t("Громкость звуков")}
+                value={a.soundVolume}
+                min={5}
+                max={100}
+                step={5}
+                suffix="%"
+                onChange={(v) => set("soundVolume", v)}
+              />
             </div>
-            <button className="btn icon" title="Послушать" onClick={() => sounds.play()}>
+            <button className="btn icon" title={t("Послушать")} onClick={() => sounds.play()}>
               <Icon name="volume" />
             </button>
           </div>
@@ -469,7 +503,7 @@ export default function SettingsPage(props: Props) {
               checked={a.compactSidebar}
               onChange={(e) => set("compactSidebar", e.target.checked)}
             />
-            Компактная боковая панель (только иконки)
+            {t("Компактная боковая панель (только иконки)")}
           </label>
         )}
       </section>

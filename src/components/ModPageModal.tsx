@@ -2,6 +2,7 @@ import { type MouseEvent, useEffect, useMemo, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, ContentKind, errorText, formatNumber, Instance, ModPage, Source } from "../api";
 import { markdownToHtml, sanitizeHtml } from "../richtext";
+import { locale, t } from "../i18n";
 import { Icon } from "./Icon";
 
 export type InstallState = "installed" | "pending" | "installing" | "none";
@@ -45,7 +46,7 @@ const DEPENDENCY_LABELS: Record<ModPage["dependencies"][number]["kind"], string>
 function formatDate(iso?: string | null): string {
   if (!iso) return "";
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" });
 }
 
 function shortList(items: string[], max = 3): string {
@@ -95,7 +96,7 @@ export default function ModPageModal(props: Props) {
   }, [viewing, page, onClose]);
 
   const body = useMemo(
-    () => (page ? sanitizeHtml(page.bodyHtml ? page.body : markdownToHtml(page.body), "Видео") : ""),
+    () => (page ? sanitizeHtml(page.bodyHtml ? page.body : markdownToHtml(page.body), t("Видео")) : ""),
     [page],
   );
   const hasFitting = !!page?.versions.some((v) => v.compatible);
@@ -115,11 +116,11 @@ export default function ModPageModal(props: Props) {
     onInstall &&
     (state === "installed" ? (
       <button className="btn" disabled>
-        <Icon name="check" /> Установлен
+        <Icon name="check" /> {t("Установлен")}
       </button>
     ) : state === "pending" ? (
       <button className="btn" onClick={onShowPending}>
-        Скачать вручную
+        {t("Скачать вручную")}
       </button>
     ) : (
       <button
@@ -128,7 +129,7 @@ export default function ModPageModal(props: Props) {
         onClick={() => onInstall(page.source, page.projectId, page.title)}
       >
         {state === "installing" ? <span className="spinner" /> : <Icon name="download" />}
-        {state === "installing" ? "Установка…" : "Установить"}
+        {state === "installing" ? t("Установка…") : t("Установить")}
       </button>
     ));
 
@@ -137,36 +138,36 @@ export default function ModPageModal(props: Props) {
       <div className="modal mod-page" onMouseDown={(e) => e.stopPropagation()}>
         <header className="mod-page-head">
           {stack.length > 1 && (
-            <button className="btn icon" title="Назад" onClick={() => setStack((s) => s.slice(0, -1))}>
+            <button className="btn icon" title={t("Назад")} onClick={() => setStack((s) => s.slice(0, -1))}>
               <Icon name="back" />
             </button>
           )}
           {page?.iconUrl ? <img className="mod-page-icon" src={page.iconUrl} alt="" /> : <div className="mod-page-icon mod-icon-fallback" />}
           <div className="grow mod-page-title">
-            <h2 className="truncate">{page?.title ?? "Загрузка…"}</h2>
+            <h2 className="truncate">{page?.title ?? t("Загрузка…")}</h2>
             {page && (
               <div className="muted small mod-page-meta">
-                {page.author && <span>от {page.author}</span>}
+                {page.author && <span>{t("от {author}", { author: page.author })}</span>}
                 <span>
                   <Icon name="download" size={12} /> {formatNumber(page.downloads)}
                 </span>
-                {page.updated && <span>обновлён {formatDate(page.updated)}</span>}
+                {page.updated && <span>{t("обновлён {date}", { date: formatDate(page.updated) })}</span>}
                 {page.license && <span>{page.license}</span>}
               </div>
             )}
           </div>
           {installButton}
           {page && (
-            <button className="btn icon" title="Открыть на сайте" onClick={() => openUrl(page.pageUrl).catch(() => {})}>
+            <button className="btn icon" title={t("Открыть на сайте")} onClick={() => openUrl(page.pageUrl).catch(() => {})}>
               <Icon name="external" />
             </button>
           )}
-          <button className="btn icon" title="Закрыть" onClick={onClose}>
+          <button className="btn icon" title={t("Закрыть")} onClick={onClose}>
             <Icon name="close" />
           </button>
         </header>
 
-        {error && <div className="error-box">Не удалось открыть страницу: {error}</div>}
+        {error && <div className="error-box">{t("Не удалось открыть страницу: {error}", { error })}</div>}
         {!page && !error && (
           <div className="mod-page-loading">
             <span className="spinner" />
@@ -184,28 +185,28 @@ export default function ModPageModal(props: Props) {
               ))}
               {page.links.map((l) => (
                 <button key={l.url} className="tag tag-link" onClick={() => openUrl(l.url).catch(() => {})}>
-                  <Icon name="external" size={11} /> {LINK_LABELS[l.kind]}
+                  <Icon name="external" size={11} /> {t(LINK_LABELS[l.kind])}
                 </button>
               ))}
             </div>
 
             <div className="tabs">
               <button className={tab === "about" ? "on" : ""} onClick={() => setTab("about")}>
-                Описание
+                {t("Описание")}
               </button>
               {page.gallery.length > 0 && (
                 <button className={tab === "gallery" ? "on" : ""} onClick={() => setTab("gallery")}>
-                  Галерея <span className="badge">{page.gallery.length}</span>
+                  {t("Галерея")} <span className="badge">{page.gallery.length}</span>
                 </button>
               )}
               {page.versions.length > 0 && (
                 <button className={tab === "versions" ? "on" : ""} onClick={() => setTab("versions")}>
-                  Версии
+                  {t("Версии")}
                 </button>
               )}
               {page.dependencies.length > 0 && (
                 <button className={tab === "dependencies" ? "on" : ""} onClick={() => setTab("dependencies")}>
-                  Зависимости <span className="badge">{page.dependencies.length}</span>
+                  {t("Зависимости")} <span className="badge">{page.dependencies.length}</span>
                 </button>
               )}
             </div>
@@ -215,7 +216,7 @@ export default function ModPageModal(props: Props) {
                 (body.trim() ? (
                   <div className="mod-body" onClick={openLink} dangerouslySetInnerHTML={{ __html: body }} />
                 ) : (
-                  <p className="muted">Автор не добавил описание.</p>
+                  <p className="muted">{t("Автор не добавил описание.")}</p>
                 ))}
 
               {tab === "gallery" && (
@@ -234,11 +235,11 @@ export default function ModPageModal(props: Props) {
                   {hasFitting && instance && (
                     <label className="checkbox small">
                       <input type="checkbox" checked={onlyFitting} onChange={(e) => setOnlyFitting(e.target.checked)} />
-                      Только подходящие для «{instance.name}»
+                      {t("Только подходящие для «{name}»", { name: instance.name })}
                     </label>
                   )}
                   {!hasFitting && instance && kind !== "shader" && (
-                    <p className="hint">Среди последних версий нет подходящей для «{instance.name}».</p>
+                    <p className="hint">{t("Среди последних версий нет подходящей для «{name}».", { name: instance.name })}</p>
                   )}
                   <div className="version-list">
                     {versions.map((v, i) => (
@@ -250,7 +251,9 @@ export default function ModPageModal(props: Props) {
                             {v.loaders.length > 0 && ` · ${v.loaders.join(", ")}`}
                           </div>
                         </div>
-                        <span className={`release-badge ${v.releaseType}`}>{RELEASE_LABELS[v.releaseType] ?? v.releaseType}</span>
+                        <span className={`release-badge ${v.releaseType}`}>
+                          {RELEASE_LABELS[v.releaseType] ? t(RELEASE_LABELS[v.releaseType]) : v.releaseType}
+                        </span>
                         <span className="muted small version-date">{formatDate(v.date)}</span>
                       </div>
                     ))}
@@ -269,7 +272,9 @@ export default function ModPageModal(props: Props) {
                       {d.iconUrl ? <img src={d.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
                       <div className="grow">
                         <div className="mod-title">{d.title}</div>
-                        <div className={`small dependency-kind ${d.kind}`}>{DEPENDENCY_LABELS[d.kind] ?? d.kind}</div>
+                        <div className={`small dependency-kind ${d.kind}`}>
+                          {DEPENDENCY_LABELS[d.kind] ? t(DEPENDENCY_LABELS[d.kind]) : d.kind}
+                        </div>
                       </div>
                       <Icon name="chevron" />
                     </button>

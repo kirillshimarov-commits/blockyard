@@ -1,4 +1,5 @@
 import { InstalledMod } from "../api";
+import { t } from "../i18n";
 import { Icon } from "./Icon";
 
 interface Props {
@@ -20,7 +21,7 @@ export default function ContentList({ items, disabled, onRemove, onToggle, onOpe
           {m.iconUrl ? <img src={m.iconUrl} alt="" /> : <div className="mod-icon-fallback" />}
           <div className="grow">
             {onOpen ? (
-              <button className="link mod-title" title="Подробнее" onClick={() => onOpen(m)}>
+              <button className="link mod-title" title={t("Подробнее")} onClick={() => onOpen(m)}>
                 {m.title}
               </button>
             ) : (
@@ -32,7 +33,7 @@ export default function ContentList({ items, disabled, onRemove, onToggle, onOpe
             </div>
           </div>
           {onToggle && (
-            <label className="switch" title={m.disabled ? "Включить мод" : "Выключить мод"}>
+            <label className="switch" title={m.disabled ? t("Включить мод") : t("Выключить мод")}>
               <input
                 type="checkbox"
                 checked={!m.disabled}
@@ -42,7 +43,7 @@ export default function ContentList({ items, disabled, onRemove, onToggle, onOpe
               <span />
             </label>
           )}
-          <button className="btn icon" title="Удалить" disabled={disabled} onClick={() => onRemove(m.projectId)}>
+          <button className="btn icon" title={t("Удалить")} disabled={disabled} onClick={() => onRemove(m.projectId)}>
             <Icon name="trash" />
           </button>
         </div>

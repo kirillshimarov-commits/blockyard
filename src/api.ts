@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { t } from "./i18n";
 
 export type LoaderType = "fabric" | "quilt" | "forge" | "neoforge";
 export type Loader = { type: "vanilla" } | { type: LoaderType; version: string };
@@ -327,8 +328,8 @@ export function loaderLabel(loader: Loader): string {
 }
 
 export function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")} млн`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")} тыс.`;
+  if (n >= 1_000_000) return t("{n} млн", { n: (n / 1_000_000).toFixed(1).replace(/\.0$/, "") });
+  if (n >= 1_000) return t("{n} тыс.", { n: (n / 1_000).toFixed(1).replace(/\.0$/, "") });
   return String(n);
 }
 
@@ -336,12 +337,12 @@ export function formatNumber(n: number): string {
 export function formatPlayTime(seconds?: number): string {
   const s = seconds ?? 0;
   if (s <= 0) return "";
-  if (s < 60) return "меньше минуты";
+  if (s < 60) return t("меньше минуты");
   const minutes = Math.floor(s / 60);
-  if (minutes < 60) return `${minutes} мин`;
+  if (minutes < 60) return t("{m} мин", { m: minutes });
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return hours >= 10 || rest === 0 ? `${hours} ч` : `${hours} ч ${rest} мин`;
+  return hours >= 10 || rest === 0 ? t("{h} ч", { h: hours }) : t("{h} ч {m} мин", { h: hours, m: rest });
 }
 
 export function errorText(e: unknown): string {

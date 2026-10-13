@@ -16,6 +16,7 @@ import {
 } from "../api";
 import ModPageModal from "../components/ModPageModal";
 import BisectPanel from "../components/BisectPanel";
+import { t, tStage } from "../i18n";
 import type { GameStatus } from "../App";
 import { Icon } from "../components/Icon";
 import PendingDownloadsModal from "../components/PendingDownloadsModal";
@@ -87,7 +88,7 @@ export default function InstanceView(props: Props) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [logs, tab]);
 
-  if (!instance) return <div className="page muted">Сборка не найдена</div>;
+  if (!instance) return <div className="page muted">{t("Сборка не найдена")}</div>;
   const hasLoader = instance.loader.type !== "vanilla";
   const progress = status?.progress;
   const percent = progress && progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : null;
@@ -104,12 +105,12 @@ export default function InstanceView(props: Props) {
     try {
       const path = await save({
         defaultPath: `${instance!.name}.mrpack`,
-        filters: [{ name: "Модпак Modrinth", extensions: ["mrpack"] }],
+        filters: [{ name: t("Модпак Modrinth"), extensions: ["mrpack"] }],
       });
       if (!path) return;
-      notify("Экспортирую сборку…");
+      notify(t("Экспортирую сборку…"));
       await api.exportInstance(instance!.id, path);
-      notify("Сборка сохранена — её можно отправить другу");
+      notify(t("Сборка сохранена — её можно отправить другу"));
       revealItemInDir(path).catch(() => {});
     } catch (e) {
       notify(errorText(e), true);
@@ -153,18 +154,21 @@ export default function InstanceView(props: Props) {
         <div className="grow">
           <h1>{instance.name}</h1>
           <p className="muted">
-            Minecraft {instance.gameVersion} · {loaderLabel(instance.loader)} · {instance.memoryMb} МБ ОЗУ
-            {instance.modpack ? ` · модпак «${instance.modpack.title}»` : ""}
-            {formatPlayTime(instance.playSeconds) ? ` · наиграно ${formatPlayTime(instance.playSeconds)}` : ""}
+            Minecraft {instance.gameVersion} · {loaderLabel(instance.loader)} ·{" "}
+            {t("{n} МБ ОЗУ", { n: instance.memoryMb })}
+            {instance.modpack ? ` · ${t("модпак «{name}»", { name: instance.modpack.title })}` : ""}
+            {formatPlayTime(instance.playSeconds)
+              ? ` · ${t("наиграно {time}", { time: formatPlayTime(instance.playSeconds) })}`
+              : ""}
           </p>
         </div>
-        <button className="btn icon" title="Настройки сборки" onClick={() => setShowSettings(true)}>
+        <button className="btn icon" title={t("Настройки сборки")} onClick={() => setShowSettings(true)}>
           <Icon name="gear" />
         </button>
-        <button className="btn icon" title="Экспорт в .mrpack (поделиться сборкой)" onClick={exportPack}>
+        <button className="btn icon" title={t("Экспорт в .mrpack (поделиться сборкой)")} onClick={exportPack}>
           <Icon name="share" />
         </button>
-        <button className="btn icon" title="Открыть папку" onClick={openFolder}>
+        <button className="btn icon" title={t("Открыть папку")} onClick={openFolder}>
           <Icon name="folder" />
         </button>
         {state === "stopped" ? (
@@ -180,11 +184,11 @@ export default function InstanceView(props: Props) {
               }
             }}
           >
-            <Icon name="play" /> Играть
+            <Icon name="play" /> {t("Играть")}
           </button>
         ) : (
           <button className="btn danger big" onClick={onStop}>
-            <Icon name="stop" /> {state === "installing" ? "Отмена" : "Закрыть игру"}
+            <Icon name="stop" /> {state === "installing" ? t("Отмена") : t("Закрыть игру")}
           </button>
         )}
       </header>
@@ -192,7 +196,7 @@ export default function InstanceView(props: Props) {
       {state === "installing" && (
         <div className="progress-card">
           <div className="row between">
-            <span>{progress?.stage ?? "Подготовка"}</span>
+            <span>{tStage(progress?.stage ?? "Подготовка")}</span>
             <span className="muted">
               {progress && progress.total > 1 ? `${progress.current} / ${progress.total}` : ""}
             </span>
@@ -226,7 +230,7 @@ export default function InstanceView(props: Props) {
             <div>{status.error}</div>
             {status.hints && status.hints.length > 0 && (
               <>
-                <strong className="small">Вероятная причина:</strong>
+                <strong className="small">{t("Вероятная причина:")}</strong>
                 <ul className="hints">
                   {status.hints.map((h) => (
                     <li key={h}>{h}</li>
@@ -236,7 +240,9 @@ export default function InstanceView(props: Props) {
             )}
             {instance.pending.length > 0 && (
               <div className="small">
-                Не скачаны моды: {instance.pending.map((p) => p.title).join(", ")} — это частая причина вылетов.
+                {t("Не скачаны моды: {list} — это частая причина вылетов.", {
+                  list: instance.pending.map((p) => p.title).join(", "),
+                })}
               </div>
             )}
           </div>
@@ -246,12 +252,12 @@ export default function InstanceView(props: Props) {
                 className="btn"
                 onClick={() => openPath(status.crashReport!).catch((e) => notify(errorText(e), true))}
               >
-                Открыть отчёт о сбое
+                {t("Открыть отчёт о сбое")}
               </button>
             )}
             {canSearch && (
-              <button className="btn" onClick={startSearch} title="Лаунчер по очереди выключит часть модов и найдёт виновника">
-                <Icon name="bug" /> Найти виновника
+              <button className="btn" onClick={startSearch} title={t("Лаунчер по очереди выключит часть модов и найдёт виновника")}>
+                <Icon name="bug" /> {t("Найти виновника")}
               </button>
             )}
           </div>
@@ -260,50 +266,48 @@ export default function InstanceView(props: Props) {
 
       <div className="tabs">
         <button className={tab === "mods" ? "on" : ""} onClick={() => setTab("mods")}>
-          Моды {instance.mods.length > 0 && <span className="badge">{instance.mods.length}</span>}
+          {t("Моды")} {instance.mods.length > 0 && <span className="badge">{instance.mods.length}</span>}
         </button>
         <button className={tab === "shaders" ? "on" : ""} onClick={() => setTab("shaders")}>
-          Шейдеры {instance.shaders.length > 0 && <span className="badge">{instance.shaders.length}</span>}
+          {t("Шейдеры")} {instance.shaders.length > 0 && <span className="badge">{instance.shaders.length}</span>}
         </button>
         <button className={tab === "resourcepacks" ? "on" : ""} onClick={() => setTab("resourcepacks")}>
-          Ресурспаки{" "}
+          {t("Ресурспаки")}{" "}
           {instance.resourcepacks.length > 0 && <span className="badge">{instance.resourcepacks.length}</span>}
         </button>
         <button className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>
-          Журнал
+          {t("Журнал")}
         </button>
       </div>
 
       {tab === "mods" &&
         (!hasLoader ? (
           <div className="empty small">
-            <p className="muted">Это ванильная сборка. Чтобы ставить моды, создайте сборку с Fabric, Forge или NeoForge.</p>
+            <p className="muted">{t("Это ванильная сборка. Чтобы ставить моды, создайте сборку с Fabric, Forge или NeoForge.")}</p>
           </div>
         ) : (
           <>
             {instance.pending.length > 0 && (
               <div className="warning-box row between">
-                <span>Ждут ручного скачивания: {instance.pending.map((p) => p.title).join(", ")}</span>
+                <span>{t("Ждут ручного скачивания: {list}", { list: instance.pending.map((p) => p.title).join(", ") })}</span>
                 <button className="btn" onClick={() => setShowPending(true)}>
-                  Скачать
+                  {t("Скачать")}
                 </button>
               </div>
             )}
             <div className="row between">
               <span className="muted">
                 {instance.mods.length
-                  ? `Установленные моды${
-                      instance.mods.some((m) => m.disabled)
-                        ? ` (выключено: ${instance.mods.filter((m) => m.disabled).length})`
-                        : ""
-                    }`
-                  : "Модов пока нет"}
+                  ? instance.mods.some((m) => m.disabled)
+                    ? t("Установленные моды (выключено: {n})", { n: instance.mods.filter((m) => m.disabled).length })
+                    : t("Установленные моды")
+                  : t("Модов пока нет")}
               </span>
               <div className="row gap-sm">
                 {canSearch && (
                   <button
                     className="btn icon"
-                    title="Найти мод, из-за которого игра вылетает: лаунчер по очереди выключит часть модов"
+                    title={t("Найти мод, из-за которого игра вылетает: лаунчер по очереди выключит часть модов")}
                     onClick={startSearch}
                   >
                     <Icon name="bug" />
@@ -311,11 +315,11 @@ export default function InstanceView(props: Props) {
                 )}
                 {instance.mods.length > 0 && (
                   <button className="btn" disabled={state !== "stopped"} onClick={() => setShowUpdates(true)}>
-                    Проверить обновления
+                    {t("Проверить обновления")}
                   </button>
                 )}
                 <button className="btn primary" onClick={() => onBrowse("mod")}>
-                  <Icon name="plus" /> Добавить моды
+                  <Icon name="plus" /> {t("Добавить моды")}
                 </button>
               </div>
             </div>
@@ -332,18 +336,18 @@ export default function InstanceView(props: Props) {
       {tab === "shaders" &&
         (!hasLoader ? (
           <div className="empty small">
-            <p className="muted">Для шейдеров нужна сборка с Fabric, Forge, NeoForge или Quilt.</p>
+            <p className="muted">{t("Для шейдеров нужна сборка с Fabric, Forge, NeoForge или Quilt.")}</p>
           </div>
         ) : (
           <>
             <div className="row between">
               <span className="muted">
                 {instance.shaders.length
-                  ? "Включить шейдер: в игре Настройки → Графика → Наборы шейдеров"
-                  : "Шейдеров пока нет"}
+                  ? t("Включить шейдер: в игре Настройки → Графика → Наборы шейдеров")
+                  : t("Шейдеров пока нет")}
               </span>
               <button className="btn primary" onClick={() => onBrowse("shader")}>
-                <Icon name="plus" /> Добавить шейдеры
+                <Icon name="plus" /> {t("Добавить шейдеры")}
               </button>
             </div>
             <ContentList
@@ -360,11 +364,11 @@ export default function InstanceView(props: Props) {
           <div className="row between">
             <span className="muted">
               {instance.resourcepacks.length
-                ? "Включить: в игре Настройки → Пакеты ресурсов"
-                : "Ресурспаков пока нет"}
+                ? t("Включить: в игре Настройки → Пакеты ресурсов")
+                : t("Ресурспаков пока нет")}
             </span>
             <button className="btn primary" onClick={() => onBrowse("resourcepack")}>
-              <Icon name="plus" /> Добавить ресурспаки
+              <Icon name="plus" /> {t("Добавить ресурспаки")}
             </button>
           </div>
           <ContentList
@@ -413,7 +417,7 @@ export default function InstanceView(props: Props) {
 
       {tab === "log" && (
         <pre className="log" ref={logRef}>
-          {logs.length ? logs.join("\n") : "Журнал появится после запуска игры."}
+          {logs.length ? logs.join("\n") : t("Журнал появится после запуска игры.")}
         </pre>
       )}
 
@@ -433,7 +437,7 @@ export default function InstanceView(props: Props) {
             setShowSettings(false);
             api
               .repairInstance(instance.id)
-              .then(() => notify("Исправляю сборку…"))
+              .then(() => notify(t("Исправляю сборку…")))
               .catch((e) => notify(errorText(e), true));
           }}
           notify={notify}

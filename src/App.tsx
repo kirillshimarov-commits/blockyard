@@ -21,6 +21,7 @@ import {
   saveAppearance,
 } from "./appearance";
 import { configureSounds, sounds } from "./sounds";
+import { locale, setLanguage, t } from "./i18n";
 
 export type View =
   | { kind: "library" }
@@ -44,10 +45,10 @@ function Clock() {
     const t = window.setInterval(() => setNow(new Date()), 10_000);
     return () => window.clearInterval(t);
   }, []);
-  const time = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  const day = now.toLocaleDateString("ru-RU", { weekday: "long" });
+  const time = now.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" });
+  const day = now.toLocaleDateString(locale(), { weekday: "long" });
   return (
-    <span className="clock" title={now.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}>
+    <span className="clock" title={now.toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" })}>
       {time}
       <span className="clock-day">, {day.charAt(0).toUpperCase() + day.slice(1)}</span>
     </span>
@@ -223,13 +224,16 @@ export default function App() {
     [notify],
   );
 
+  // Every child renders after this line, so the whole interface follows the chosen language.
+  setLanguage(appearance.language);
+
   const nav: { key: string; view: View; label: string; icon: IconName }[] = [
-    { key: "library", view: { kind: "library" }, label: appearance.layout === "console" ? "Главная" : "Библиотека", icon: "grid" },
-    { key: "mod", view: { kind: "browse", content: "mod" }, label: "Моды", icon: "puzzle" },
-    { key: "shader", view: { kind: "browse", content: "shader" }, label: "Шейдеры", icon: "sun" },
-    { key: "resourcepack", view: { kind: "browse", content: "resourcepack" }, label: "Ресурспаки", icon: "image" },
-    { key: "modpack", view: { kind: "browse", content: "modpack" }, label: "Готовые сборки", icon: "layers" },
-    { key: "settings", view: { kind: "settings" }, label: "Настройки", icon: "gear" },
+    { key: "library", view: { kind: "library" }, label: appearance.layout === "console" ? t("Главная") : t("Библиотека"), icon: "grid" },
+    { key: "mod", view: { kind: "browse", content: "mod" }, label: t("Моды"), icon: "puzzle" },
+    { key: "shader", view: { kind: "browse", content: "shader" }, label: t("Шейдеры"), icon: "sun" },
+    { key: "resourcepack", view: { kind: "browse", content: "resourcepack" }, label: t("Ресурспаки"), icon: "image" },
+    { key: "modpack", view: { kind: "browse", content: "modpack" }, label: t("Готовые сборки"), icon: "layers" },
+    { key: "settings", view: { kind: "settings" }, label: t("Настройки"), icon: "gear" },
   ];
   const active = view.kind === "instance" ? "library" : view.kind === "browse" ? view.content : view.kind;
 
@@ -240,7 +244,7 @@ export default function App() {
   const guestBanner = tunnel.guest && (
     <div className={`guest-banner ${tunnel.guest.connected ? "" : "lost"}`}>
       <span>
-        {tunnel.guest.connected ? "В мире друга" : "Связь с другом потеряна"}
+        {tunnel.guest.connected ? t("В мире друга") : t("Связь с другом потеряна")}
         <br />
         <small className="muted">{linkLabel(tunnel.guest.link)}</small>
       </span>
@@ -253,7 +257,7 @@ export default function App() {
             .catch(() => {})
         }
       >
-        Отключиться
+        {t("Отключиться")}
       </button>
     </div>
   );
@@ -286,7 +290,7 @@ export default function App() {
             {tunnel.guest && (
               <span className={`status-chip ${tunnel.guest.connected ? "" : "lost"}`} title={linkLabel(tunnel.guest.link)}>
                 <span className="dot" data-state={tunnel.guest.connected ? "running" : "stopped"} />
-                {tunnel.guest.connected ? "В мире друга" : "Связь потеряна"}
+                {tunnel.guest.connected ? t("В мире друга") : t("Связь потеряна")}
                 <button
                   className="link small"
                   onClick={() =>
@@ -296,26 +300,26 @@ export default function App() {
                       .catch(() => {})
                   }
                 >
-                  Выйти
+                  {t("Выйти")}
                 </button>
               </span>
             )}
             {launcherUpdate && (
-              <button className="status-chip accent" disabled={updating} onClick={installUpdate} title="Скачать и установить">
+              <button className="status-chip accent" disabled={updating} onClick={installUpdate} title={t("Скачать и установить")}>
                 {updating ? <span className="spinner" /> : <Icon name="download" size={14} />}
-                {updating ? "Скачиваю…" : `Обновить до ${launcherUpdate.version}`}
+                {updating ? t("Скачиваю…") : t("Обновить до {version}", { version: launcherUpdate.version })}
               </button>
             )}
             <button
               className={`icon-btn spin-on-hover ${view.kind === "settings" ? "active" : ""}`}
-              title="Настройки"
+              title={t("Настройки")}
               onClick={() => setView({ kind: "settings" })}
             >
               <Icon name="gear" />
             </button>
             <button
               className="avatar-btn"
-              title={`${activeAccount?.username ?? settings?.username ?? ""} · ${activeAccount ? "Microsoft" : "офлайн"}`}
+              title={`${activeAccount?.username ?? settings?.username ?? ""} · ${activeAccount ? "Microsoft" : t("офлайн")}`}
               onClick={() => setView({ kind: "settings" })}
             >
               {activeAccount ? (
@@ -349,7 +353,7 @@ export default function App() {
         </nav>
         {instances.length > 0 && (
           <div className="sidebar-instances">
-            <div className="sidebar-label">Сборки</div>
+            <div className="sidebar-label">{t("Сборки")}</div>
             {instances.slice(0, 8).map((inst) => (
               <button
                 key={inst.id}
@@ -364,13 +368,13 @@ export default function App() {
         )}
         {guestBanner}
         {launcherUpdate && (
-          <div className="update-banner" title={`Доступна версия ${launcherUpdate.version}`}>
+          <div className="update-banner" title={t("Доступна версия {version}", { version: launcherUpdate.version })}>
             <span>
-              Доступна версия <strong>{launcherUpdate.version}</strong>
+              {t("Доступна версия")} <strong>{launcherUpdate.version}</strong>
             </span>
             <button className="btn primary" disabled={updating} onClick={installUpdate}>
               {updating ? <span className="spinner" /> : <Icon name="download" />}
-              <span>{updating ? "Скачиваю…" : "Обновить"}</span>
+              <span>{updating ? t("Скачиваю…") : t("Обновить")}</span>
             </button>
           </div>
         )}
@@ -382,7 +386,7 @@ export default function App() {
           )}
           <div>
             <div className="account-name">{activeAccount?.username ?? settings?.username ?? "…"}</div>
-            <div className="muted small">{activeAccount ? "Microsoft" : "Офлайн-аккаунт"}</div>
+            <div className="muted small">{activeAccount ? "Microsoft" : t("Офлайн-аккаунт")}</div>
           </div>
         </div>
       </aside>

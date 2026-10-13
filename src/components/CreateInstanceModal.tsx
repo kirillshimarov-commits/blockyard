@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, errorText, Instance, Loader, LOADER_NAMES, LoaderVersion, McVersion } from "../api";
+import { t } from "../i18n";
 
 interface Props {
   onClose: () => void;
@@ -30,7 +31,7 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
         const latest = list.find((v) => v.type === "release");
         if (latest) setGameVersion(latest.id);
       })
-      .catch((e) => setError(`Не удалось получить список версий: ${errorText(e)}`));
+      .catch((e) => setError(t("Не удалось получить список версий: {error}", { error: errorText(e) })));
   }, []);
 
   useEffect(() => {
@@ -80,10 +81,10 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Новая сборка</h2>
+        <h2>{t("Новая сборка")}</h2>
 
         <label className="field">
-          <span>Название</span>
+          <span>{t("Название")}</span>
           <input
             value={name}
             onChange={(e) => {
@@ -94,7 +95,7 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
         </label>
 
         <div className="field">
-          <span>Загрузчик модов</span>
+          <span>{t("Загрузчик модов")}</span>
           <div className="segmented">
             {LOADERS.map((l) => (
               <button key={l} className={loaderType === l ? "on" : ""} onClick={() => setLoaderType(l)}>
@@ -106,25 +107,25 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
 
         <div className="row">
           <label className="field grow">
-            <span>Версия Minecraft</span>
+            <span>{t("Версия Minecraft")}</span>
             <select value={gameVersion} onChange={(e) => setGameVersion(e.target.value)}>
               {shown.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.id}
-                  {v.type === "snapshot" ? " (снапшот)" : ""}
+                  {v.type === "snapshot" ? ` (${t("снапшот")})` : ""}
                 </option>
               ))}
             </select>
           </label>
           {needsLoader && (
             <label className="field grow">
-              <span>Версия {LOADER_NAMES[loaderType]}</span>
+              <span>{t("Версия {loader}", { loader: LOADER_NAMES[loaderType] })}</span>
               <select value={loaderVersion} onChange={(e) => setLoaderVersion(e.target.value)} disabled={!loaders.length}>
-                {loadingLoaders && <option>Загрузка…</option>}
+                {loadingLoaders && <option>{t("Загрузка…")}</option>}
                 {loaders.map((l) => (
                   <option key={l.version} value={l.version}>
                     {l.version.startsWith(`${gameVersion}-`) ? l.version.slice(gameVersion.length + 1) : l.version}
-                    {l.recommended ? " (рекомендуется)" : l.stable ? "" : " (beta)"}
+                    {l.recommended ? ` (${t("рекомендуется")})` : l.stable ? "" : " (beta)"}
                   </option>
                 ))}
               </select>
@@ -134,27 +135,31 @@ export default function CreateInstanceModal({ onClose, onCreated }: Props) {
 
         <label className="checkbox">
           <input type="checkbox" checked={showSnapshots} onChange={(e) => setShowSnapshots(e.target.checked)} />
-          Показывать снапшоты
+          {t("Показывать снапшоты")}
         </label>
 
-        {unavailable && <div className="hint">{LOADER_NAMES[loaderType]} для этой версии не найден.</div>}
+        {unavailable && (
+          <div className="hint">{t("{loader} для этой версии не найден.", { loader: LOADER_NAMES[loaderType] })}</div>
+        )}
         {(loaderType === "forge" || loaderType === "neoforge") && (
           <p className="muted small">
-            Первый запуск сборки с {LOADER_NAMES[loaderType]} дольше обычного: лаунчер устанавливает загрузчик.
+            {t("Первый запуск сборки с {loader} дольше обычного: лаунчер устанавливает загрузчик.", {
+              loader: LOADER_NAMES[loaderType],
+            })}
           </p>
         )}
         {error && <div className="error-box">{error}</div>}
 
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t("Отмена")}
           </button>
           <button
             className="btn primary"
             disabled={busy || !gameVersion || !name.trim() || (needsLoader && !loaderVersion)}
             onClick={create}
           >
-            Создать
+            {t("Создать")}
           </button>
         </div>
       </div>

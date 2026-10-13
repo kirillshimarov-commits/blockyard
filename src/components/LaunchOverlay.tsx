@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Instance } from "../api";
 import type { GameStatus } from "../App";
 import InstanceCover from "./InstanceCover";
+import { t, tStage } from "../i18n";
 
 /** Full-screen "starting the game" screen; fades out once the game window is up. */
 export default function LaunchOverlay({
@@ -28,13 +29,13 @@ export default function LaunchOverlay({
     if (state === "installing") return;
     if (loadingGame) {
       // Never hang on this screen if the window cannot be embedded for some reason.
-      const t = window.setTimeout(onClose, 180_000);
-      return () => window.clearTimeout(t);
+      const timer = window.setTimeout(onClose, 180_000);
+      return () => window.clearTimeout(timer);
     }
     // Running: let the player see that it worked. Stopped: an error toast or crash card takes over.
     setLeaving(true);
-    const t = window.setTimeout(onClose, state === "running" && !embedded ? 1400 : 400);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(onClose, state === "running" && !embedded ? 1400 : 400);
+    return () => window.clearTimeout(timer);
   }, [state, loadingGame, embedded, onClose]);
 
   const percent = progress?.total ? Math.round((progress.current / progress.total) * 100) : null;
@@ -47,10 +48,10 @@ export default function LaunchOverlay({
       <div className="launch-title">{instance.name}</div>
       <div className="launch-stage">
         {loadingGame
-          ? "Загружаем игру…"
+          ? t("Загружаем игру…")
           : state === "running"
-            ? "Приятной игры!"
-            : (progress?.stage ?? "Подготовка к запуску…")}
+            ? t("Приятной игры!")
+            : tStage(progress?.stage ?? "Подготовка к запуску…")}
       </div>
       <div className="launch-bar">
         <div
@@ -59,7 +60,7 @@ export default function LaunchOverlay({
         />
       </div>
       <button className="link muted small" onClick={onClose}>
-        Скрыть
+        {t("Скрыть")}
       </button>
     </div>
   );

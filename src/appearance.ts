@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { t } from "./i18n";
 
 export type ThemeMode = "system" | "dark" | "light";
 export type WindowEffect = "auto" | "mica" | "acrylic" | "blur" | "none";
@@ -168,7 +169,7 @@ export function compressImage(file: File, maxSide = 1920): Promise<string> {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Не удалось открыть картинку"));
+      reject(new Error(t("Не удалось открыть картинку")));
     };
     img.src = url;
   });

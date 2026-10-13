@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, errorText, Instance, InviteInfo, loaderLabel } from "../api";
+import { t } from "../i18n";
 
 interface Props {
   instances: Instance[];
@@ -52,7 +53,7 @@ export default function JoinFriendModal({ instances, onClose, onJoined, onCreate
     if (!info) return;
     setBusy(true);
     try {
-      const inst = await api.createInstance(`${info.world} (у друга)`, info.gameVersion, info.loader);
+      const inst = await api.createInstance(t("{world} (у друга)", { world: info.world }), info.gameVersion, info.loader);
       onCreated(inst);
       await join(inst.id);
     } catch (e) {
@@ -64,12 +65,12 @@ export default function JoinFriendModal({ instances, onClose, onJoined, onCreate
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Подключиться к другу</h2>
+        <h2>{t("Подключиться к другу")}</h2>
         <label className="field">
-          <span>Код-приглашение</span>
+          <span>{t("Код-приглашение")}</span>
           <textarea
             rows={3}
-            placeholder="Вставьте код, который прислал друг (начинается с BY1-)"
+            placeholder={t("Вставьте код, который прислал друг (начинается с BY1-)")}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             autoFocus
@@ -84,7 +85,7 @@ export default function JoinFriendModal({ instances, onClose, onJoined, onCreate
             </div>
             {matching.length > 0 ? (
               <label className="field section-gap">
-                <span>Играть в сборке</span>
+                <span>{t("Играть в сборке")}</span>
                 <select value={instanceId} onChange={(e) => setInstanceId(e.target.value)}>
                   {matching.map((i) => (
                     <option key={i.id} value={i.id}>
@@ -95,8 +96,9 @@ export default function JoinFriendModal({ instances, onClose, onJoined, onCreate
               </label>
             ) : (
               <p className="hint">
-                У вас нет сборки с такой же версией и загрузчиком. Её можно создать автоматически. Если в мире друга
-                есть моды, их нужно будет поставить такие же.
+                {t(
+                  "У вас нет сборки с такой же версией и загрузчиком. Её можно создать автоматически. Если в мире друга есть моды, их нужно будет поставить такие же.",
+                )}
               </p>
             )}
           </div>
@@ -105,16 +107,16 @@ export default function JoinFriendModal({ instances, onClose, onJoined, onCreate
 
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>
-            Отмена
+            {t("Отмена")}
           </button>
           {info && matching.length > 0 && (
             <button className="btn primary" disabled={busy || !instanceId} onClick={() => join(instanceId)}>
-              {busy ? <span className="spinner" /> : null} Подключиться и играть
+              {busy ? <span className="spinner" /> : null} {t("Подключиться и играть")}
             </button>
           )}
           {info && matching.length === 0 && (
             <button className="btn primary" disabled={busy} onClick={createAndJoin}>
-              {busy ? <span className="spinner" /> : null} Создать сборку и подключиться
+              {busy ? <span className="spinner" /> : null} {t("Создать сборку и подключиться")}
             </button>
           )}
         </div>

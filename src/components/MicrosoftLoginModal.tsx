@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Account, api, DeviceCode, errorText } from "../api";
+import { t } from "../i18n";
 
 interface Props {
   onClose: () => void;
@@ -40,32 +41,34 @@ export default function MicrosoftLoginModal({ onClose, onDone }: Props) {
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Вход через Microsoft</h2>
+        <h2>{t("Вход через Microsoft")}</h2>
         {error ? (
           <div className="error-box">{error}</div>
         ) : !code ? (
           <div className="row gap-sm muted">
-            <span className="spinner" /> Подключаюсь к Microsoft…
+            <span className="spinner" /> {t("Подключаюсь к Microsoft…")}
           </div>
         ) : (
           <>
             <p className="muted">
-              1. Откройте страницу входа Microsoft.
+              {t("1. Откройте страницу входа Microsoft.")}
               <br />
-              2. Введите этот код и войдите в аккаунт, на котором куплен Minecraft.
+              {t("2. Введите этот код и войдите в аккаунт, на котором куплен Minecraft.")}
             </p>
-            <button className="device-code" onClick={copy} title="Скопировать">
+            <button className="device-code" onClick={copy} title={t("Скопировать")}>
               {code.userCode}
             </button>
-            <p className="muted small center-text">{copied ? "Код скопирован" : "Нажмите на код, чтобы скопировать"}</p>
+            <p className="muted small center-text">
+              {copied ? t("Код скопирован") : t("Нажмите на код, чтобы скопировать")}
+            </p>
             <div className="row gap-sm muted small">
-              <span className="spinner" /> Жду, пока вы войдёте…
+              <span className="spinner" /> {t("Жду, пока вы войдёте…")}
             </div>
           </>
         )}
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>
-            {error ? "Закрыть" : "Отмена"}
+            {error ? t("Закрыть") : t("Отмена")}
           </button>
           {code && !error && (
             <button
@@ -75,7 +78,7 @@ export default function MicrosoftLoginModal({ onClose, onDone }: Props) {
                 openUrl(code.verificationUri);
               }}
             >
-              Скопировать код и открыть страницу
+              {t("Скопировать код и открыть страницу")}
             </button>
           )}
         </div>
