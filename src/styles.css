@@ -2075,6 +2075,31 @@ button.status-chip {
   transform: scale(1.04);
   pointer-events: none;
 }
+.splash-greet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+.splash.stars .splash-greet {
+  opacity: 0;
+  transform: translateY(-16px);
+}
+.splash-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.splash.stars .splash-canvas {
+  opacity: 1;
+}
 .splash-logo {
   width: 96px;
   height: 96px;

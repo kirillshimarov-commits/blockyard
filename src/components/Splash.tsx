@@ -1,25 +1,36 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import IntroStars from "./IntroStars";
 
-/** Short intro: the logo lights up, the greeting appears, then everything fades into the home screen. */
+/**
+ * Intro: the logo lights up and the greeting appears, then a big star rises, bursts into
+ * a star field the camera flies through, and everything fades into the home screen.
+ * A click skips it.
+ */
 export default function Splash({ name, onDone }: { name: string; onDone: () => void }) {
-  const [leaving, setLeaving] = useState(false);
+  const [phase, setPhase] = useState<"greet" | "stars" | "leaving">("greet");
+  const finish = useCallback(() => setPhase("leaving"), []);
 
   useEffect(() => {
-    const leave = window.setTimeout(() => setLeaving(true), 1900);
-    const done = window.setTimeout(onDone, 2500);
-    return () => {
-      window.clearTimeout(leave);
-      window.clearTimeout(done);
-    };
-  }, [onDone]);
+    const stars = window.setTimeout(() => setPhase("stars"), 1900);
+    return () => window.clearTimeout(stars);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "leaving") return;
+    const done = window.setTimeout(onDone, 650);
+    return () => window.clearTimeout(done);
+  }, [phase, onDone]);
 
   return (
-    <div className={`splash ${leaving ? "leaving" : ""}`} onClick={onDone}>
-      <img className="splash-logo" src="/logo.svg" alt="" />
-      <div className="splash-title">
-        Добро пожаловать{name ? `, ${name}` : ""}
+    <div className={`splash ${phase !== "greet" ? "stars" : ""} ${phase === "leaving" ? "leaving" : ""}`} onClick={onDone}>
+      <IntroStars running={phase !== "greet"} onEnd={finish} />
+      <div className="splash-greet">
+        <img className="splash-logo" src="/logo.svg" alt="" />
+        <div className="splash-title">
+          Добро пожаловать{name ? `, ${name}` : ""}
+        </div>
+        <div className="splash-sub">Blockyard</div>
       </div>
-      <div className="splash-sub">Blockyard</div>
     </div>
   );
 }
