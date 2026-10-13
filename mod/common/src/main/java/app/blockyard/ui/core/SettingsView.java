@@ -132,12 +132,11 @@ public final class SettingsView {
         Canvas c = f.c;
         String label, sub;
         float h;
-        switch (row) {
-            case Slider sl -> { label = sl.label(); sub = sl.sub(); }
-            case Toggle t -> { label = t.label(); sub = t.sub(); }
-            case Choice ch -> { label = ch.label(); sub = ch.sub(); }
-            case Button b -> { label = b.label(); sub = b.sub(); }
-        }
+        // if-chains instead of pattern switches: the 1.20.1 builds compile for Java 17.
+        if (row instanceof Slider sl) { label = sl.label(); sub = sl.sub(); }
+        else if (row instanceof Toggle t) { label = t.label(); sub = t.sub(); }
+        else if (row instanceof Choice ch) { label = ch.label(); sub = ch.sub(); }
+        else { Button b = (Button) row; label = b.label(); sub = b.sub(); }
         float labelH = Kit.lh(Kit.PILL) + (sub == null ? 0 : 0.75f + Kit.lh(Kit.SUB));
         float ctrlH = row instanceof Choice ? 2.25f * 2 + Kit.lh(Kit.SEG) + 2 : row instanceof Slider ? 6 : 7.5f;
         h = Math.max(labelH, ctrlH) + 3.5f * 2;
@@ -151,8 +150,7 @@ public final class SettingsView {
         c.text(Fonts.fit(label, Kit.PILL, labelMax), Kit.PILL, x + 4.5f, ly, Kit.WHITE);
         if (sub != null) c.text(Fonts.fit(sub, Kit.SUB, labelMax), Kit.SUB, x + 4.5f, ly + Kit.lh(Kit.PILL) + 0.75f, Kit.MUTED);
         float right = x + w - 4.5f;
-        switch (row) {
-            case Slider sl -> {
+        if (row instanceof Slider sl) {
                 String v = sl.value().get();
                 float vw = Math.max(19, Kit.w(v, Kit.BODY_B) + 6);
                 float pillH = Kit.lh(Kit.BODY_B) + 2.5f;
@@ -164,20 +162,17 @@ public final class SettingsView {
                     s.dragging = sl;
                     sl.set().accept(Math.max(0, Math.min(1, (mx - tx) / tw)));
                 });
-            }
-            case Toggle t -> {
+        } else if (row instanceof Toggle t) {
                 boolean on = t.get().getAsBoolean();
                 Kit.toggle(c, right - 13, cy, on, f.accent);
                 if (visible) f.hit(x, y, w, h, () -> t.set().accept(!on));
-            }
-            case Choice ch -> {
+        } else if (row instanceof Choice ch) {
                 int on = ch.get().getAsInt();
                 float sw = Kit.segWidth(ch.names(), on);
                 int before = f.hits.size();
                 Kit.segmented(f, ch.names(), on, right - sw, cy, i -> ch.set().accept(i));
                 if (!visible) f.hits.subList(before, f.hits.size()).clear();
-            }
-            case Button b -> {
+        } else if (row instanceof Button b) {
                 if (b.badge() != null) {
                     float bw = Kit.w(b.badge(), Kit.BODY_B) + 6, bh = Kit.lh(Kit.BODY_B) + 2.5f;
                     c.fillRound(right - 6 - bw, cy - bh / 2, bw, bh, bh / 2, Kit.WHITE);
@@ -185,7 +180,6 @@ public final class SettingsView {
                 }
                 c.icon("chevron", right - 4.5f, cy - 2.5f, 5, hov ? Kit.WHITE : Kit.MUTED);
                 if (visible) f.hit(x, y, w, h, b.action());
-            }
         }
         return h;
     }
