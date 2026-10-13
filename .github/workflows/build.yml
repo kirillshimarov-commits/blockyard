@@ -78,10 +78,30 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Test backend
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml 2>&1 | tee -a launcher-build.log
 
       - name: Build installer
-        run: pnpm tauri build
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm tauri build 2>&1 | tee -a launcher-build.log
+
+      # The log goes to the "log-launcher" branch, so failures can be read without opening Actions.
+      - name: Publish log
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/log"
+          cp launcher-build.log "$RUNNER_TEMP/log/build.log" || true
+          grep -nE "^error|error[|warning: unused|FAILED|panicked|ERR_|error TS" launcher-build.log | head -300 > "$RUNNER_TEMP/log/summary.txt" || true
+          echo "${{ job.status }} ${GITHUB_SHA} ${GITHUB_REF_NAME}" > "$RUNNER_TEMP/log/status.txt"
+          cd "$RUNNER_TEMP/log"
+          git init -q && git checkout -q -b log-launcher
+          git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "Launcher build log of ${GITHUB_SHA}"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" log-launcher
 
       - uses: actions/upload-artifact@v4
         with:
