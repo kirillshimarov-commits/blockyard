@@ -1,7 +1,21 @@
 pluginManagement {
     repositories {
         maven { url = "https://maven.fabricmc.net/" }
+        maven { url = "https://maven.architectury.dev/" }
+        maven { url = "https://maven.neoforged.net/releases/" }
+        maven { url = "https://maven.minecraftforge.net/" }
         gradlePluginPortal()
     }
+    plugins {
+        // Architectury Loom builds Fabric, Forge and NeoForge from the same Yarn-named sources.
+        id "dev.architectury.loom" version "1.7.416"
+    }
 }
+
 rootProject.name = "blockyard-ui"
+
+// One project per loader and game version. Sources are shared:
+//   common/       the launcher-style views drawn with Java2D, no Minecraft code;
+//   mc-<version>/ screens, canvas and mixins for that game version;
+//   <loader>-<version>/ the loader's entry, metadata and platform calls.
+include "fabric-1.21.1", "neoforge-1.21.1"

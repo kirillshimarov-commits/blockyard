@@ -1,8 +1,13 @@
 name: Mod check
 
+# Builds the mod on mod-* branches and publishes the log and the jar list to the
+# "log-<branch>" branch, so the result can be read without opening Actions.
 on:
   push:
     branches: ["mod-*"]
+
+permissions:
+  contents: write
 
 jobs:
   mod:
@@ -17,5 +22,25 @@ jobs:
         with:
           gradle-version: "8.10.2"
       - name: Build mod
+        id: build
         working-directory: mod
-        run: gradle build --no-daemon
+        run: |
+          set -o pipefail
+          gradle build --no-daemon --continue --stacktrace 2>&1 | tee ../build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blockyard-ui-mods
+          path: mod/*/build/libs/blockyard-ui-*.jar
+      - name: Publish log
+        if: always()
+        run: |
+          mkdir -p /tmp/log
+          cp build.log /tmp/log/build.log || true
+          grep -nE "error:|FAILED|BUILD (SUCCESSFUL|FAILED)|What went wrong|Could not" build.log | head -300 > /tmp/log/summary.txt || true
+          ls -la mod/*/build/libs > /tmp/log/jars.txt 2>&1 || true
+          echo "${{ steps.build.outcome }} ${GITHUB_SHA}" > /tmp/log/status.txt
+          cd /tmp/log
+          git init -q && git checkout -q -b "log-${GITHUB_REF_NAME}"
+          git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "Build log of ${GITHUB_SHA}"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" "log-${GITHUB_REF_NAME}"

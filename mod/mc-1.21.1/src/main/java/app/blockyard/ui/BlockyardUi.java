@@ -1,7 +1,5 @@
 package app.blockyard.ui;
 
-import net.fabricmc.loader.api.FabricLoader;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Matcher;
@@ -30,7 +28,7 @@ public final class BlockyardUi {
         if (loaded) return;
         loaded = true;
         try {
-            Path file = FabricLoader.getInstance().getConfigDir().resolve("blockyard-ui.json");
+            Path file = PlatformImpl.configDir().resolve("blockyard-ui.json");
             if (!Files.isRegularFile(file)) return;
             Matcher m = Pattern.compile("\"accent\"\\s*:\\s*\"#?([0-9a-fA-F]{6})\"").matcher(Files.readString(file));
             if (m.find()) accent = Integer.parseInt(m.group(1), 16);

@@ -1,11 +1,9 @@
 package app.blockyard.ui.mc;
 
 import app.blockyard.ui.BlockyardUi;
+import app.blockyard.ui.PlatformImpl;
 import app.blockyard.ui.core.Frame;
 import app.blockyard.ui.core.HomeView;
-import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.ModContainer;
-import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
@@ -84,15 +82,7 @@ public class HomeScreen extends UiScreen implements HomeView.Model {
     }
 
     static List<HomeView.Mod> loadMods() {
-        List<HomeView.Mod> out = new ArrayList<>();
-        FabricLoader.getInstance().getAllMods().stream()
-                .filter(m -> !m.getMetadata().getType().equals("builtin") && m.getContainingMod().isEmpty())
-                .sorted(Comparator.comparing(m -> m.getMetadata().getName().toLowerCase(Locale.ROOT)))
-                .forEach(m -> {
-                    ModMetadata meta = m.getMetadata();
-                    out.add(new HomeView.Mod(meta.getId(), meta.getName(), meta.getVersion().getFriendlyString(), meta.getDescription(), null));
-                });
-        return out;
+        return PlatformImpl.mods();
     }
 
     /** Mod icons arrive later; the list is rebuilt with whatever is loaded. */
@@ -103,10 +93,7 @@ public class HomeScreen extends UiScreen implements HomeView.Model {
     }
 
     static BufferedImage modIcon(String id) {
-        ModContainer c = FabricLoader.getInstance().getModContainer(id).orElse(null);
-        if (c == null) return null;
-        String path = c.getMetadata().getIconPath(64).orElse(null);
-        return Images.file("m:" + id, path == null ? null : c.findPath(path).orElse(null));
+        return Images.file("m:" + id, PlatformImpl.modIcon(id));
     }
 
     private void loadScreenshots() {

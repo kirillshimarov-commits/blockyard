@@ -1,0 +1,41 @@
+// Applied by every loader project after the Loom plugin.
+
+version = rootProject.mod_version
+group = rootProject.maven_group
+base { archivesName = "blockyard-ui-${project.name}" }
+
+sourceSets {
+    main {
+        java.srcDirs += [rootProject.file("common/src/main/java"), rootProject.file("mc-${project.minecraft_version}/src/main/java")]
+        resources.srcDirs += [rootProject.file("common/src/main/resources"), rootProject.file("mc-${project.minecraft_version}/src/main/resources")]
+    }
+}
+
+repositories {
+    maven { url = "https://maven.architectury.dev/" }
+    maven { url = "https://maven.neoforged.net/releases/" }
+    maven { url = "https://maven.minecraftforge.net/" }
+}
+
+loom {
+    mixin {
+        defaultRefmapName.set("blockyard-ui-refmap.json")
+    }
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching(["fabric.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml"]) {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = (project.java_version as int)
+    it.options.encoding = "UTF-8"
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion(project.java_version)
+    targetCompatibility = JavaVersion.toVersion(project.java_version)
+}

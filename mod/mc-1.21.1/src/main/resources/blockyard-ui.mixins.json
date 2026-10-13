@@ -3,6 +3,7 @@
   "minVersion": "0.8",
   "package": "app.blockyard.ui.mixin",
   "compatibilityLevel": "JAVA_21",
+  "refmap": "blockyard-ui-refmap.json",
   "client": [
     "MinecraftClientMixin",
     "LoadingScreensMixin",
