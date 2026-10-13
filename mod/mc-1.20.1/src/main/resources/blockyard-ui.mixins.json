@@ -9,8 +9,9 @@
     "ScreenMixin",
     "DrawContextMixin",
     "TextRendererMixin",
-    "ClickableWidgetMixin",
-    "SliderWidgetAccessor",
+    "PressableWidgetMixin",
+    "SliderWidgetMixin",
+    "TabButtonWidgetMixin",
     "GameMenuScreenAccessor",
     "EntryListWidgetMixin",
     "TabNavigationWidgetMixin"
