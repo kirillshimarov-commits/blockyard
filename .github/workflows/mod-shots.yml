@@ -30,7 +30,8 @@ jobs:
         with:
           gradle-version: "9.8.1"
       - name: Install virtual display
-        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb libgl1-mesa-dri mesa-utils
+        # 26.3 also tries Vulkan: lavapipe is the software one.
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb libgl1-mesa-dri mesa-utils mesa-vulkan-drivers libvulkan1
       - name: Run the game
         # "[shots-next]" runs only the 26.x versions.
         if: ${{ !contains(github.event.head_commit.message, '[shots-next]') || contains(matrix.target, '-26.') }}
@@ -44,7 +45,7 @@ jobs:
           build=""; case "${{ matrix.target }}" in *-26.*) build="-p next";; esac
           mkdir -p $run
           printf 'lang:ru_ru\nonboardAccessibility:false\nguiScale:0\nskipMultiplayerWarning:true\ntutorialStep:none\nsoundCategory_master:0.0\nrenderDistance:4\nsimulationDistance:5\n' > $run/options.txt
-          timeout 40m xvfb-run -a -s "-screen 0 1920x1080x24" gradle $build :${{ matrix.target }}:runClient --no-daemon > $run/gradle-run.log 2>&1 || true
+          timeout 40m xvfb-run -a -s "-screen 0 1920x1080x24 +extension GLX +render -noreset" gradle $build :${{ matrix.target }}:runClient --no-daemon > $run/gradle-run.log 2>&1 || true
           tail -50 $run/gradle-run.log
           ls -la $run/screenshots || true
       - name: Publish screenshots
