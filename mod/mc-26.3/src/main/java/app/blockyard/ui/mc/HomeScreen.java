@@ -297,7 +297,7 @@ public class HomeScreen extends UiScreen implements HomeView.Model {
     public void openShots() {
         File dir = minecraft.gameDirectory.toPath().resolve("screenshots").toFile();
         dir.mkdirs();
-        Util.getPlatform().openFile(dir);
+        com.mojang.blaze3d.Blaze3D.openPath(dir.toPath());
     }
 
     public void playAndInvite() {

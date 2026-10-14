@@ -161,7 +161,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
                             minecraft.gui.setScreen(new OptionsScreen(this, o));
                         }),
                         new SettingsView.Button("Папка игры", "Сохранения, скриншоты, конфиги", null,
-                                () -> Util.getPlatform().openFile(minecraft.gameDirectory)))))
+                                () -> com.mojang.blaze3d.Blaze3D.openPath(minecraft.gameDirectory.toPath())))))
                 , false));
 
         int maxScale = Math.max(1, minecraft.getWindow().calculateScale(0, minecraft.isEnforceUnicode()));
@@ -280,7 +280,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
                     sections = null;
                 }),
                 new SettingsView.Button("Открыть папку", "Положите сюда .zip с паком", null,
-                        () -> Util.getPlatform().openPath(minecraft.getResourcePackDirectory())));
+                        () -> com.mojang.blaze3d.Blaze3D.openPath(minecraft.getResourcePackDirectory())));
         List<Pack> profiles = new ArrayList<>(manager.getAvailablePacks());
         profiles.sort((p1, p2) -> {
             boolean e1 = packsEnabled.contains(p1.getId()), e2 = packsEnabled.contains(p2.getId());
