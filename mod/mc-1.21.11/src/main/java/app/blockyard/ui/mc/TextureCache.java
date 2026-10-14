@@ -1,6 +1,8 @@
 package app.blockyard.ui.mc;
 
 import app.blockyard.ui.core.Raster;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.FilterMode;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
@@ -66,8 +68,12 @@ final class TextureCache {
                 ni.setColorArgb(x, y, p);
             }
         }
-        NativeImageBackedTexture tex = new NativeImageBackedTexture(() -> "blockyard-ui", ni);
-        tex.setFilter(smooth, false);
+        // From 1.21.11 filtering is a sampler the texture holds; smooth pieces get a linear one.
+        NativeImageBackedTexture tex = new NativeImageBackedTexture(() -> "blockyard-ui", ni) {
+            {
+                if (smooth) sampler = RenderSystem.getSamplerCache().get(FilterMode.LINEAR);
+            }
+        };
         Identifier id = Identifier.of("blockyard-ui", "gen/" + (counter++));
         MinecraftClient.getInstance().getTextureManager().registerTexture(id, tex);
         return new Entry(id, w, h, img.ox(), img.oy());
