@@ -15,8 +15,7 @@ pluginManagement {
 
 rootProject.name = "blockyard-ui-next"
 
-// 26.3 follows once 26.2 works.
-for (target in ["fabric-26.1", "neoforge-26.1", "fabric-26.2", "neoforge-26.2"]) {
+for (target in ["fabric-26.1", "neoforge-26.1", "fabric-26.2", "neoforge-26.2", "fabric-26.3", "neoforge-26.3"]) {
     include target
     project(":${target}").projectDir = file("../${target}")
 }
