@@ -1,0 +1,46 @@
+name: Mod API
+
+# Dumps the signatures (javap) of the game's client classes for the unobfuscated versions to
+# the "api-<version>" branches, to port the mod against them. On demand or with "[api]".
+on:
+  workflow_dispatch:
+  push:
+    branches: ["mod-*"]
+
+permissions:
+  contents: write
+
+jobs:
+  api:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[api]')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["26.1.2", "26.2", "26.3"]
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - name: Dump
+        run: |
+          v=${{ matrix.version }}
+          url=$(curl -s https://piston-meta.mojang.com/mc/game/version_manifest_v2.json | jq -r --arg v "$v" '.versions[] | select(.id == $v) | .url')
+          jar=$(curl -s "$url" | jq -r '.downloads.client.url')
+          curl -s -o client.jar "$jar"
+          mkdir -p classes /tmp/api && cd classes && unzip -q ../client.jar 'net/minecraft/*' 'com/mojang/*' && cd ..
+          for pkg in net/minecraft/client com/mojang/blaze3d; do
+            find classes/$pkg -name '*.class' | sed 's|^classes/||; s|\.class$||' | sort > list.txt
+            name=$(echo $pkg | tr / .)
+            javap -p -cp classes $(cat list.txt) > /tmp/api/$name.txt 2>&1 || true
+          done
+          # Classes elsewhere that the mod touches.
+          javap -p -cp classes $(cd classes && ls net/minecraft/network/chat/*.class net/minecraft/util/FormattedCharSequence.class net/minecraft/resources/Identifier.class net/minecraft/sounds/SoundEvents.class net/minecraft/sounds/SoundSource.class net/minecraft/world/entity/player/PlayerModelPart.class net/minecraft/world/level/storage/LevelSummary.class | sed 's|\.class$||') > /tmp/api/other.txt 2>&1 || true
+          ls -la /tmp/api
+      - name: Publish
+        run: |
+          cd /tmp/api
+          git init -q && git checkout -q -b "api-${{ matrix.version }}"
+          git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "API of ${{ matrix.version }}"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" "api-${{ matrix.version }}"
