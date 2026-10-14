@@ -13,7 +13,7 @@ permissions:
 jobs:
   shots:
     # The full game run costs minutes on every target: only on demand or with "[shots]" in the commit message.
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[shots]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[shots]') || contains(github.event.head_commit.message, '[shots-next]')
     runs-on: ubuntu-latest
     timeout-minutes: 50
     strategy:
@@ -32,6 +32,8 @@ jobs:
       - name: Install virtual display
         run: sudo apt-get update -q && sudo apt-get install -y -q xvfb libgl1-mesa-dri mesa-utils
       - name: Run the game
+        # "[shots-next]" runs only the 26.x versions.
+        if: ${{ !contains(github.event.head_commit.message, '[shots-next]') || contains(matrix.target, '-26.') }}
         working-directory: mod
         env:
           BLOCKYARD_SELFTEST: "1"
@@ -46,7 +48,7 @@ jobs:
           tail -50 $run/gradle-run.log
           ls -la $run/screenshots || true
       - name: Publish screenshots
-        if: always()
+        if: ${{ always() && (!contains(github.event.head_commit.message, '[shots-next]') || contains(matrix.target, '-26.')) }}
         run: |
           run=mod/${{ matrix.target }}/run
           mkdir -p /tmp/shots
