@@ -5,7 +5,9 @@ import app.blockyard.ui.PlatformImpl;
 import app.blockyard.ui.core.Frame;
 import app.blockyard.ui.core.HomeView;
 import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
@@ -310,25 +312,25 @@ public class HomeScreen extends UiScreen implements HomeView.Model {
         int idx = selected();
         if (tab == HomeView.MULTI) {
             if (idx >= 0 && idx < count()) {
-                items.add(new HomeView.MenuItem("Изменить сервер", false, () -> client.setScreen(new ServerDialog(this, idx))));
+                items.add(new HomeView.MenuItem("Изменить сервер", false, () -> minecraft.setScreen(new ServerDialog(this, idx))));
                 items.add(new HomeView.MenuItem("Обновить статус", false, () -> {
-                    ServerInfo s = servers.get(idx);
-                    s.setStatus(ServerInfo.Status.INITIAL);
+                    ServerData s = servers.get(idx);
+                    s.setState(ServerData.State.INITIAL);
                     ping(s);
                 }));
                 items.add(new HomeView.MenuItem("Удалить сервер", true, () -> {
                     servers.remove(servers.get(idx));
-                    servers.saveFile();
+                    servers.save();
                 }));
             }
             items.add(new HomeView.MenuItem("Добавить сервер", false, this::add));
         } else {
-            items.add(new HomeView.MenuItem("Управление мирами", false, () -> client.setScreen(new SelectWorldScreen(this))));
+            items.add(new HomeView.MenuItem("Управление мирами", false, () -> minecraft.setScreen(new SelectWorldScreen(this))));
             items.add(new HomeView.MenuItem("Создать мир", false, this::add));
         }
         items.add(new HomeView.MenuItem("Классическое меню", false, () -> {
             BlockyardUi.vanillaOnce = true;
-            client.setScreen(new TitleScreen());
+            minecraft.setScreen(new TitleScreen());
         }));
         items.add(new HomeView.MenuItem("Выйти из игры", true, minecraft::stop));
         return items;

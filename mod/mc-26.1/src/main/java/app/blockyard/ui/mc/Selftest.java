@@ -56,7 +56,7 @@ public final class Selftest {
         step("08-settings-packs", () -> ((SettingsScreen) mc.screen).section(SettingsScreen.PACKS), always, 30);
         step("09-vanilla-options", () -> {
             BlockyardUi.vanillaOptions = true;
-            mc.setScreen(new OptionsScreen(home, mc.options));
+            mc.setScreen(new OptionsScreen(home, mc.options, false));
         }, always, 30);
         step("10-vanilla-video", () -> mc.setScreen(new VideoSettingsScreen(mc.screen, mc, mc.options)), always, 30);
         step("11-vanilla-keybinds", () -> mc.setScreen(new KeyBindsScreen(home, mc.options)), always, 30);
@@ -69,7 +69,7 @@ public final class Selftest {
         step("18-settings-in-game", () -> mc.setScreen(new SettingsScreen(null, SettingsScreen.VIDEO)), always, 30);
         step("19-vanilla-options-in-game", () -> {
             BlockyardUi.vanillaOptions = true;
-            mc.setScreen(new OptionsScreen(null, mc.options));
+            mc.setScreen(new OptionsScreen(null, mc.options, false));
         }, always, 30);
         step(null, mc::stop, always, 0);
     }

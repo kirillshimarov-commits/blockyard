@@ -152,4 +152,9 @@ public class ServerDialog extends UiScreen implements DialogView.Model {
     public void onClose() {
         minecraft.setScreen(parent);
     }
+
+    // The dialog view closes through its model; Screen calls it onClose in Mojang's names.
+    public void close() {
+        onClose();
+    }
 }

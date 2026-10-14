@@ -70,7 +70,7 @@ public class PauseScreen extends UiScreen implements PauseView.Model {
     public String subtitle() {
         String world = BlockyardUi.loadingTitle;
         if (world == null) world = singleplayer() ? "Одиночная игра" : "Сетевая игра";
-        if (minecraft.level != null) world += " · день " + (minecraft.level.getDayTime() / 24000L + 1);
+        if (minecraft.level != null) world += " · день " + (minecraft.level.getGameTime() / 24000L + 1);
         return world;
     }
 

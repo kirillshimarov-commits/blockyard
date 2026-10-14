@@ -10,6 +10,10 @@ import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.options.AccessibilityOptionsScreen;
+import net.minecraft.client.gui.screens.options.OptionsScreen;
+import net.minecraft.client.gui.screens.options.VideoSettingsScreen;
+import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.resources.language.LanguageInfo;
 import net.minecraft.network.chat.Component;
@@ -116,13 +120,13 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
 
     private SettingsView.Slider intSlider(String label, String sub, OptionInstance<Integer> option, int min, int max, IntFunction<String> text) {
         return new SettingsView.Slider(label, sub,
-                () -> (option.getValue() - min) / (double) (max - min),
-                v -> option.setValue((int) Math.round(min + v * (max - min))),
-                () -> text.apply(option.getValue()));
+                () -> (option.get() - min) / (double) (max - min),
+                v -> option.set((int) Math.round(min + v * (max - min))),
+                () -> text.apply(option.get()));
     }
 
     private SettingsView.Slider percent(String label, String sub, OptionInstance<Double> option) {
-        return new SettingsView.Slider(label, sub, option::get, option::set, () -> Math.round(option.getValue() * 100) + "%");
+        return new SettingsView.Slider(label, sub, option::get, option::set, () -> Math.round(option.get() * 100) + "%");
     }
 
     private SettingsView.Toggle toggle(String label, String sub, OptionInstance<Boolean> option) {
@@ -131,9 +135,9 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
 
     private <E> SettingsView.Choice choice(String label, String sub, OptionInstance<E> option, E[] values, String[] names) {
         return new SettingsView.Choice(label, sub, names, () -> {
-            for (int i = 0; i < values.length; i++) if (values[i] == option.getValue()) return i;
+            for (int i = 0; i < values.length; i++) if (values[i] == option.get()) return i;
             return 0;
-        }, i -> option.setValue(values[i]));
+        }, i -> option.set(values[i]));
     }
 
     private static SettingsView.Group group(String title, List<SettingsView.Row> rows) {
@@ -154,10 +158,10 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
                 group("Ещё", List.of(
                         new SettingsView.Button("Все настройки Minecraft", "Обычный экран настроек игры", null, () -> {
                             BlockyardUi.vanillaOptions = true;
-                            client.setScreen(new OptionsScreen(this, o));
+                            minecraft.setScreen(new OptionsScreen(this, o, false));
                         }),
                         new SettingsView.Button("Папка игры", "Сохранения, скриншоты, конфиги", null,
-                                () -> Util.getOperatingSystem().open(client.runDirectory)))))
+                                () -> Util.getPlatform().openFile(minecraft.gameDirectory)))))
                 , false));
 
         int maxScale = Math.max(1, minecraft.getWindow().calculateScale(0, minecraft.isEnforceUnicode()));
@@ -172,7 +176,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
                         toggle("Полный экран", null, o.fullscreen()),
                         toggle("Вертикальная синхронизация", null, o.enableVsync()),
                         new SettingsView.Choice("Размер интерфейса", null, scales,
-                                () -> Math.min(scales.length - 1, o.getGuiScale().getValue()), i -> o.getGuiScale().setValue(i)))),
+                                () -> Math.min(scales.length - 1, o.guiScale().get()), i -> o.guiScale().set(i)))),
                 group("Качество", List.of(
                         choice("Графика", null, o.graphicsPreset(), new GraphicsPreset[]{GraphicsPreset.FAST, GraphicsPreset.FANCY, GraphicsPreset.FABULOUS, GraphicsPreset.CUSTOM},
                                 new String[]{"Быстрая", "Детальная", "Лучшая", "Своя"}),
@@ -182,10 +186,10 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
                                 new String[]{"Мин.", "Меньше", "Все"}),
                         toggle("Мягкое освещение", null, o.ambientOcclusion()),
                         toggle("Тени сущностей", null, o.entityShadows()),
-                        new SettingsView.Slider("Яркость", "Как у Mojang: «Мрачно» — «Ярко»", () -> o.getGamma().getValue(), v -> o.getGamma().setValue(v),
-                                () -> o.getGamma().getValue() <= 0.001 ? "Мрачно" : o.getGamma().getValue() >= 0.999 ? "Ярко" : Math.round(o.getGamma().getValue() * 100) + "%"),
+                        new SettingsView.Slider("Яркость", "Как у Mojang: «Мрачно» — «Ярко»", () -> o.gamma().get(), v -> o.gamma().set(v),
+                                () -> o.gamma().get() <= 0.001 ? "Мрачно" : o.gamma().get() >= 0.999 ? "Ярко" : Math.round(o.gamma().get() * 100) + "%"),
                         new SettingsView.Button("Расширенные настройки графики", "Sodium и другие моды графики", null,
-                                () -> client.setScreen(new VideoOptionsScreen(this, client, o)))))), false));
+                                () -> minecraft.setScreen(new VideoSettingsScreen(this, minecraft, o)))))), false));
 
         List<SettingsView.Row> sounds = new ArrayList<>();
         for (SoundSource c : SoundSource.values()) sounds.add(percent(soundName(c), null, o.getSoundSourceOptionInstance(c)));
@@ -198,16 +202,16 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
 
         out.add(new SettingsView.Section("Управление", "keyboard", now, List.of(
                 group("Мышь", List.of(
-                        new SettingsView.Slider("Чувствительность", null, () -> o.getMouseSensitivity().getValue(), v -> o.getMouseSensitivity().setValue(v),
-                                () -> Math.round(o.getMouseSensitivity().getValue() * 200) + "%"),
+                        new SettingsView.Slider("Чувствительность", null, () -> o.sensitivity().get(), v -> o.sensitivity().set(v),
+                                () -> Math.round(o.sensitivity().get() * 200) + "%"),
                         toggle("Инверсия мыши", null, o.invertMouseY()),
-                        new SettingsView.Button("Назначение клавиш", "Все клавиши управления", null, () -> client.setScreen(new KeybindsScreen(this, o))))),
+                        new SettingsView.Button("Назначение клавиш", "Все клавиши управления", null, () -> minecraft.setScreen(new KeyBindsScreen(this, o))))),
                 group("Движение", List.of(
                         toggle("Автопрыжок", null, o.autoJump()),
                         new SettingsView.Choice("Присед", null, new String[]{"Удерживать", "Переключать"},
-                                () -> o.getSneakToggled().getValue() ? 1 : 0, i -> o.getSneakToggled().setValue(i == 1)),
+                                () -> o.toggleCrouch().get() ? 1 : 0, i -> o.toggleCrouch().set(i == 1)),
                         new SettingsView.Choice("Бег", null, new String[]{"Удерживать", "Переключать"},
-                                () -> o.getSprintToggled().getValue() ? 1 : 0, i -> o.getSprintToggled().setValue(i == 1))))), false));
+                                () -> o.toggleSprint().get() ? 1 : 0, i -> o.toggleSprint().set(i == 1))))), false));
 
         out.add(new SettingsView.Section("Чат", "chat", now, List.of(
                 group("Чат", List.of(
@@ -222,7 +226,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
 
         List<SettingsView.Row> parts = new ArrayList<>();
         for (PlayerModelPart part : PlayerModelPart.values()) {
-            parts.add(new SettingsView.Toggle(partName(part), null, () -> o.isPlayerModelPartEnabled(part), v -> o.setPlayerModelPart(part, v)));
+            parts.add(new SettingsView.Toggle(partName(part), null, () -> o.isModelPartEnabled(part), v -> o.setModelPart(part, v)));
         }
         int ph = (parts.size() + 1) / 2;
         out.add(new SettingsView.Section("Скин", "shirt", "Что видно на вашем скине", List.of(
@@ -239,7 +243,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
                         percent("Эффекты поля зрения", "Бег и зелья скорости", o.fovEffectScale()))),
                 group("Ещё", List.of(
                         new SettingsView.Button("Все настройки доступности", "Экранный диктор, контраст и другое", null,
-                                () -> client.setScreen(new AccessibilityOptionsScreen(this, o)))))), false));
+                                () -> minecraft.setScreen(new AccessibilityOptionsScreen(this, o)))))), false));
 
         out.add(new SettingsView.Section("Ресурспаки", "layers", "Включите паки и нажмите «Применить»", packs(), true));
         return out;
@@ -255,11 +259,11 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
             String code = e.getKey();
             String name = e.getValue().toComponent().getString();
             SettingsView.Row row = new SettingsView.Button(name, null, code.equals(current) ? "Выбран" : null, () -> {
-                if (code.equals(client.getLanguageManager().getLanguage())) return;
-                client.getLanguageManager().setLanguage(code);
-                client.options.language = code;
-                client.options.write();
-                client.reloadResources();
+                if (code.equals(minecraft.getLanguageManager().getSelected())) return;
+                minecraft.getLanguageManager().setSelected(code);
+                minecraft.options.languageCode = code;
+                minecraft.options.save();
+                minecraft.reloadResourcePacks();
                 sections = null;
             });
             (i++ < half ? left : rightCol).add(row);
@@ -276,7 +280,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
                     sections = null;
                 }),
                 new SettingsView.Button("Открыть папку", "Положите сюда .zip с паком", null,
-                        () -> Util.getOperatingSystem().open(client.getResourcePackDir().toFile())));
+                        () -> Util.getPlatform().openPath(minecraft.getResourcePackDirectory())));
         List<Pack> profiles = new ArrayList<>(manager.getAvailablePacks());
         profiles.sort((p1, p2) -> {
             boolean e1 = packsEnabled.contains(p1.getId()), e2 = packsEnabled.contains(p2.getId());
@@ -358,7 +362,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
         if (packsDirty) applyPacks();
         if (minecraft.options.guiScale().get() != initialGuiScale) {
             initialGuiScale = minecraft.options.guiScale().get();
-            minecraft.resizeDisplay();
+            minecraft.resizeGui();
         }
     }
 
