@@ -1,0 +1,46 @@
+name: Mod migrate
+
+# Translates the newest Yarn-named game layer to Mojang's names (the only names of the
+# unobfuscated 26.x releases) with Loom's migrateMappings, and publishes the result to the
+# "migrated" branch. Runs on demand or for a commit whose message has "[migrate]".
+on:
+  workflow_dispatch:
+  push:
+    branches: ["mod-*"]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[migrate]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.8.1"
+      - name: Migrate
+        working-directory: mod
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/out
+          for src in mc-1.21.11 fabric-1.21.11 neoforge-1.21.11; do
+            gradle :fabric-1.21.11:migrateMappings --no-daemon --stacktrace \
+              --mappings "net.minecraft:mappings:1.21.11" \
+              --input "$GITHUB_WORKSPACE/mod/$src/src/main/java" \
+              --output "/tmp/out/$src" 2>&1 | tee -a ../migrate.log || true
+          done
+      - name: Publish
+        if: always()
+        run: |
+          cp migrate.log /tmp/out/ || true
+          echo "${GITHUB_SHA}" > /tmp/out/status.txt
+          cd /tmp/out
+          git init -q && git checkout -q -b migrated
+          git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "Migrated sources of ${GITHUB_SHA}"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" migrated
