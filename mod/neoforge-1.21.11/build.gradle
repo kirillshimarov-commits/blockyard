@@ -1,0 +1,23 @@
+plugins {
+    id "dev.architectury.loom"
+}
+
+apply from: rootProject.file("shared.gradle")
+
+loom {
+    runs {
+        client {
+            programArgs "--width", "1920", "--height", "1080"
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    // NeoForge runs on Mojang's names; the patch lets the Yarn-named sources map onto them.
+    mappings loom.layered {
+        it.mappings("net.fabricmc:yarn:${project.yarn_mappings}:v2")
+        it.mappings("dev.architectury:yarn-mappings-patch-neoforge:${project.yarn_patch}")
+    }
+    neoForge "net.neoforged:neoforge:${project.neoforge_version}"
+}
