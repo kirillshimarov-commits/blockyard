@@ -1,0 +1,28 @@
+plugins {
+    id "dev.architectury.loom"
+}
+
+apply from: rootProject.file("shared.gradle")
+
+loom {
+    runs {
+        client {
+            programArgs "--width", "1920", "--height", "1080"
+            // In development the mixin config is passed on the command line.
+            programArgs "--mixin.config", "blockyard-ui.mixins.json"
+        }
+    }
+}
+
+// NeoForge of this age finds mixin configs in the jar manifest.
+jar {
+    manifest {
+        attributes "MixinConfigs": "blockyard-ui.mixins.json"
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    neoForge "net.neoforged:neoforge:${project.neoforge_version}"
+}

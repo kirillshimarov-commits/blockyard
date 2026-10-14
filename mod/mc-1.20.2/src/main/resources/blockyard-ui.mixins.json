@@ -1,0 +1,20 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "app.blockyard.ui.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "MinecraftClientMixin",
+    "LoadingScreensMixin",
+    "ScreenMixin",
+    "DrawContextMixin",
+    "TextRendererMixin",
+    "PressableWidgetMixin",
+    "SliderWidgetMixin",
+    "TabButtonWidgetMixin",
+    "GameMenuScreenAccessor",
+    "EntryListWidgetMixin",
+    "TabNavigationWidgetMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

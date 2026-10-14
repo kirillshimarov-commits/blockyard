@@ -20,7 +20,7 @@ const FABRIC_API_FILE: &str = "blockyard-fabric-api.jar";
 
 /// Whether this launcher build carries the mod for any game version.
 pub fn available() -> bool {
-    !jars::JARS.is_empty()
+    !jars::BUILDS.is_empty()
 }
 
 /// The build of the mod for the instance's loader and game version (Quilt loads Fabric mods too).
@@ -31,8 +31,10 @@ fn jar_for(instance: &Instance) -> Option<&'static [u8]> {
         Loader::NeoForge { .. } => "neoforge",
         Loader::Vanilla => return None,
     };
-    let target = format!("{loader}-{}", instance.game_version);
-    jars::JARS.iter().find(|(t, _)| *t == target).map(|(_, jar)| *jar)
+    jars::BUILDS
+        .iter()
+        .find(|b| b.loader == loader && b.versions.contains(&instance.game_version.as_str()))
+        .map(|b| b.jar)
 }
 
 /// Whether the mod is built for this instance's loader and game version.

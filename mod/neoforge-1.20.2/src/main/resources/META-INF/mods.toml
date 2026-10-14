@@ -1,0 +1,17 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "blockyard_ui"
+version = "${version}"
+displayName = "Blockyard UI"
+authors = "Blockyard"
+description = '''Menus of Minecraft in the style of the Blockyard launcher: main menu, pause, settings, loading and all other screens.'''
+
+[[dependencies.blockyard_ui]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.2,1.20.2]"
+ordering = "NONE"
+side = "CLIENT"
