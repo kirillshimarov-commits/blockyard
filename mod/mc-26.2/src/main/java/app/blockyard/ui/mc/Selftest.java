@@ -117,7 +117,7 @@ public final class Selftest {
         }
         if (wait-- > 0) return;
         if (s.name() != null) {
-            Screenshot.grab(mc.gameDirectory, s.name() + ".png", mc.mainRenderTarget(), 1, msg -> {});
+            Screenshot.grab(mc.gameDirectory, s.name() + ".png", mc.gameRenderer.mainRenderTarget(), 1, msg -> {});
             System.out.println("[Blockyard selftest] saved " + s.name() + " (" + (mc.gui.screen() == null ? "no screen" : mc.gui.screen().getClass().getName()) + ")");
         }
         index++;
