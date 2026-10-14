@@ -9,6 +9,7 @@
     "ScreenMixin",
     "DrawContextMixin",
     "TextRendererMixin",
+    "TextConsumerMixin",
     "PressableWidgetMixin",
     "TabButtonWidgetMixin",
     "EntryListWidgetMixin",

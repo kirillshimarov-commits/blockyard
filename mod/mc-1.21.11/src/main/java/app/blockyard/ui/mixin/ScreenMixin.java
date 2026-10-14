@@ -27,6 +27,7 @@ public abstract class ScreenMixin {
 
     @Inject(method = "renderWithTooltip", at = @At("HEAD"))
     private void blockyard$beginRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        Restyle.context = context;
         Restyle.begin((Screen) (Object) this);
         blockyard$tooltipPause = false;
     }

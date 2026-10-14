@@ -38,6 +38,8 @@ public final class Restyle {
     private static int active = 0;
     private static int suspended = 0;
     private static Screen current;
+    /** The context screens draw with: text drawn through a DrawnTextConsumer only knows its pose. */
+    public static DrawContext context;
 
     private Restyle() {}
 

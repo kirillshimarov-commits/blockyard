@@ -22,7 +22,7 @@ public abstract class PressableWidgetMixin extends ClickableWidget {
     @Inject(method = "renderWidget", at = @At("HEAD"), cancellable = true, require = 0)
     private void blockyard$render(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         Object self = this;
-        if (!Restyle.active() || !(self.getClass() == ButtonWidget.class || self instanceof CyclingButtonWidget<?>)) return;
+        if (!Restyle.active() || !(self.getClass() == ButtonWidget.Text.class || self instanceof CyclingButtonWidget<?>)) return;
         Restyle.button(context, getX(), getY(), getWidth(), getHeight(), getMessage().getString(), this.active, isHovered(), isFocused(), this.alpha);
         ci.cancel();
     }
