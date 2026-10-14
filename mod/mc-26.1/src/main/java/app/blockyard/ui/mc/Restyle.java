@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.WinScreen;
@@ -39,7 +39,7 @@ public final class Restyle {
     private static int suspended = 0;
     private static Screen current;
     /** The context screens draw with: text drawn through a DrawnTextConsumer only knows its pose. */
-    public static GuiGraphics context;
+    public static GuiGraphicsExtractor context;
 
     private Restyle() {}
 
@@ -76,7 +76,7 @@ public final class Restyle {
         return active > 0 && suspended == 0 && RenderSystem.isOnRenderThread();
     }
 
-    private static McCanvas gui(GuiGraphics ctx) {
+    private static McCanvas gui(GuiGraphicsExtractor ctx) {
         // Widgets pass their alpha themselves from 1.21.6: there is no shader color any more.
         return new McCanvas(ctx, (float) Minecraft.getInstance().getWindow().getGuiScale());
     }
@@ -150,15 +150,15 @@ public final class Restyle {
         return (int) Math.ceil(width(runs(of(t), -1)));
     }
 
-    public static int drawText(GuiGraphics ctx, String s, int x, int y, int color) {
+    public static int drawText(GuiGraphicsExtractor ctx, String s, int x, int y, int color) {
         return draw(ctx, runs(of(s), color), x, y);
     }
 
-    public static int drawText(GuiGraphics ctx, FormattedCharSequence t, int x, int y, int color) {
+    public static int drawText(GuiGraphicsExtractor ctx, FormattedCharSequence t, int x, int y, int color) {
         return draw(ctx, runs(of(t), color), x, y);
     }
 
-    private static int draw(GuiGraphics ctx, List<Run> runs, int x, int y) {
+    private static int draw(GuiGraphicsExtractor ctx, List<Run> runs, int x, int y) {
         float w = width(runs);
         if (runs.isEmpty() || ((runs.get(0).color() >>> 24) & 255) < 4) return x + (int) Math.ceil(w);
         McCanvas c = gui(ctx);
@@ -185,34 +185,34 @@ public final class Restyle {
     // ================================================================ widgets
 
     /** A vanilla button (also cycling buttons). */
-    public static void button(GuiGraphics ctx, int x, int y, int w, int h, String message, boolean active, boolean hovered, boolean focused, float alpha) {
+    public static void button(GuiGraphicsExtractor ctx, int x, int y, int w, int h, String message, boolean active, boolean hovered, boolean focused, float alpha) {
         McCanvas c = gui(ctx);
         c.alpha = alpha;
         Widgets.button(c, x, y, w, h, message, active, hovered || focused, accent());
     }
 
-    public static void tab(GuiGraphics ctx, int x, int y, int w, int h, String message, boolean current, boolean hovered, boolean active) {
+    public static void tab(GuiGraphicsExtractor ctx, int x, int y, int w, int h, String message, boolean current, boolean hovered, boolean active) {
         Widgets.tab(gui(ctx), x, y, w, h, message, current, hovered, active);
     }
 
-    public static void slider(GuiGraphics ctx, int x, int y, int w, int h, String message, double value, boolean active, boolean hot, float alpha) {
+    public static void slider(GuiGraphicsExtractor ctx, int x, int y, int w, int h, String message, double value, boolean active, boolean hot, float alpha) {
         McCanvas c = gui(ctx);
         c.alpha = alpha;
         Widgets.slider(c, x, y, w, h, message, (float) value, active, hot, accent());
     }
 
-    public static void tabBar(GuiGraphics ctx, int x0, int y0, int x1, int y1) {
+    public static void tabBar(GuiGraphicsExtractor ctx, int x0, int y0, int x1, int y1) {
         Widgets.tabBar(gui(ctx), x0, y0, x1, y1);
     }
 
-    public static void selection(GuiGraphics ctx, int x0, int y0, int x1, int y1) {
+    public static void selection(GuiGraphicsExtractor ctx, int x0, int y0, int x1, int y1) {
         Widgets.selection(gui(ctx), x0, y0, x1, y1, accent());
     }
 
     private static float sliderX, sliderY, sliderW, sliderH;
 
     /** GUI sprites replaced by launcher-style shapes; returns false to let vanilla draw it. */
-    public static boolean sprite(GuiGraphics ctx, Identifier id, int x, int y, int w, int h) {
+    public static boolean sprite(GuiGraphicsExtractor ctx, Identifier id, int x, int y, int w, int h) {
         if (!active() || !"minecraft".equals(id.getNamespace())) return false;
         String p = id.getPath();
         if (!p.startsWith("widget/")) return false;
@@ -247,7 +247,7 @@ public final class Restyle {
     }
 
     /** Textures of the vanilla menu background: dropped, or replaced by a glass band for lists. */
-    public static boolean texture(GuiGraphics ctx, Identifier id, int x, int y, int w, int h) {
+    public static boolean texture(GuiGraphicsExtractor ctx, Identifier id, int x, int y, int w, int h) {
         if (!active()) return false;
         String p = id.getPath();
         if (p.contains("menu_list_background")) {
@@ -262,7 +262,7 @@ public final class Restyle {
     }
 
     /** The background of a restyled screen: space in the menus, the blurred game in a world. */
-    public static void background(GuiGraphics ctx, boolean inWorld) {
+    public static void background(GuiGraphicsExtractor ctx, boolean inWorld) {
         McCanvas c = new McCanvas(ctx);
         if (inWorld) c.fillScreen(0x99060510);
         else c.space(accent(), UiScreen.seconds());

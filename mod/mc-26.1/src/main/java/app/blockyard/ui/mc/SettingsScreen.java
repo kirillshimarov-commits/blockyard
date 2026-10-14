@@ -8,7 +8,7 @@ import net.minecraft.client.CloudStatus;
 import net.minecraft.client.GraphicsPreset;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.resources.language.LanguageInfo;
@@ -58,9 +58,9 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
     }
 
     @Override
-    protected void backdrop(GuiGraphics ctx, McCanvas c, float delta) {
+    protected void backdrop(GuiGraphicsExtractor ctx, McCanvas c, float delta) {
         if (inGame()) {
-            renderBlurredBackground(ctx);
+            extractBlurredBackground(ctx);
             c.fillScreen(0x99060510);
         }
     }

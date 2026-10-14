@@ -2,7 +2,7 @@ package app.blockyard.ui.mixin;
 
 import app.blockyard.ui.mc.Restyle;
 import com.google.common.collect.ImmutableList;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.TabButton;
 import net.minecraft.client.gui.components.tabs.TabNavigationBar;
 import org.spongepowered.asm.mixin.Final;
@@ -19,8 +19,8 @@ public abstract class TabNavigationWidgetMixin {
     @Final
     private ImmutableList<TabButton> tabButtons;
 
-    @Inject(method = "render", at = @At("HEAD"), require = 0)
-    private void blockyard$bar(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "extractRenderState", at = @At("HEAD"), require = 0)
+    private void blockyard$bar(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (!Restyle.active() || tabButtons.isEmpty()) return;
         int x0 = Integer.MAX_VALUE, y0 = Integer.MAX_VALUE, x1 = Integer.MIN_VALUE, y1 = Integer.MIN_VALUE;
         for (TabButton b : tabButtons) {

@@ -3,7 +3,7 @@ package app.blockyard.ui.mixin;
 import app.blockyard.ui.mc.Restyle;
 import app.blockyard.ui.mc.Screens;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.GenericMessageScreen;
 import net.minecraft.client.gui.screens.Screen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -20,28 +20,28 @@ public abstract class ScreenMixin {
     protected Minecraft minecraft;
 
     @Shadow
-    protected abstract void renderBlurredBackground(GuiGraphics context);
+    protected abstract void extractBlurredBackground(GuiGraphicsExtractor context);
 
     @Unique
     private boolean blockyard$tooltipPause;
 
-    @Inject(method = "renderWithTooltipAndSubtitles", at = @At("HEAD"))
-    private void blockyard$beginRender(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "extractRenderStateWithTooltipAndSubtitles", at = @At("HEAD"))
+    private void blockyard$beginRender(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         Restyle.context = context;
         Restyle.begin((Screen) (Object) this);
         blockyard$tooltipPause = false;
     }
 
     /** Deferred tooltips keep the vanilla font: their boxes are sized for it. */
-    @Inject(method = "renderWithTooltipAndSubtitles", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/screens/Screen;render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V", shift = At.Shift.AFTER), require = 0)
-    private void blockyard$afterRender(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "extractRenderStateWithTooltipAndSubtitles", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/screens/Screen;extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIF)V", shift = At.Shift.AFTER), require = 0)
+    private void blockyard$afterRender(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         Restyle.suspend();
         blockyard$tooltipPause = true;
     }
 
-    @Inject(method = "renderWithTooltipAndSubtitles", at = @At("RETURN"))
-    private void blockyard$endRender(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "extractRenderStateWithTooltipAndSubtitles", at = @At("RETURN"))
+    private void blockyard$endRender(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (blockyard$tooltipPause) Restyle.resume();
         blockyard$tooltipPause = false;
         Restyle.end();
@@ -78,8 +78,8 @@ public abstract class ScreenMixin {
     }
 
     /** The saving screen has no render of its own: it gets the loading look here. */
-    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
-    private void blockyard$message(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
+    private void blockyard$message(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         Object self = this;
         if (self instanceof GenericMessageScreen screen) {
             Screens.loading(screen, context, screen.getTitle().getString());
@@ -87,11 +87,11 @@ public abstract class ScreenMixin {
         }
     }
 
-    @Inject(method = "renderBackground", at = @At("HEAD"), cancellable = true)
-    private void blockyard$background(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "extractBackground", at = @At("HEAD"), cancellable = true)
+    private void blockyard$background(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (!Restyle.active()) return;
         boolean inWorld = minecraft != null && minecraft.level != null;
-        if (inWorld) renderBlurredBackground(context);
+        if (inWorld) extractBlurredBackground(context);
         Restyle.background(context, inWorld);
         ci.cancel();
     }

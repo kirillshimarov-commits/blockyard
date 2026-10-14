@@ -9,7 +9,7 @@ import org.lwjgl.glfw.GLFW;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.GenericMessageScreen;
 import net.minecraft.client.gui.screens.achievement.StatsScreen;
 import net.minecraft.client.gui.screens.advancements.AdvancementsScreen;
@@ -31,8 +31,8 @@ public class PauseScreen extends UiScreen implements PauseView.Model {
     }
 
     @Override
-    protected void backdrop(GuiGraphics ctx, McCanvas c, float delta) {
-        renderBlurredBackground(ctx);
+    protected void backdrop(GuiGraphicsExtractor ctx, McCanvas c, float delta) {
+        extractBlurredBackground(ctx);
         c.fillScreen(0x73060510);
     }
 

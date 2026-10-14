@@ -4,7 +4,7 @@ import app.blockyard.ui.BlockyardUi;
 import app.blockyard.ui.core.Frame;
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -35,12 +35,12 @@ public abstract class UiScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         // Everything is drawn in render().
     }
 
     @Override
-    public void render(GuiGraphics ctx, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
         McCanvas c = new McCanvas(ctx);
         unit = c.guiScale() / c.ppu();
         backdrop(ctx, c, delta);
@@ -55,14 +55,14 @@ public abstract class UiScreen extends Screen {
     }
 
     /** Renders this screen as the backdrop of another one. */
-    public void renderInert(GuiGraphics ctx, float delta) {
+    public void renderInert(GuiGraphicsExtractor ctx, float delta) {
         inert = true;
-        render(ctx, -1000, -1000, delta);
+        extractRenderState(ctx, -1000, -1000, delta);
         inert = false;
     }
 
     /** What is behind the view (space by default is drawn by the views themselves). */
-    protected void backdrop(GuiGraphics ctx, McCanvas c, float delta) {}
+    protected void backdrop(GuiGraphicsExtractor ctx, McCanvas c, float delta) {}
 
     protected abstract void draw(Frame f, float delta);
 

@@ -11,7 +11,7 @@ import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 
 /**
@@ -24,7 +24,7 @@ import net.minecraft.client.renderer.RenderPipelines;
  * there, so straight (not premultiplied) textures tinted by the vertex color look right.
  */
 public final class McCanvas implements Canvas {
-    private final GuiGraphics ctx;
+    private final GuiGraphicsExtractor ctx;
     private final float gs;
     private final int fbW, fbH;
     private final float ppu;
@@ -33,12 +33,12 @@ public final class McCanvas implements Canvas {
     public float alpha = 1;
 
     /** A canvas 270 units tall over the whole window. */
-    public McCanvas(GuiGraphics ctx) {
+    public McCanvas(GuiGraphicsExtractor ctx) {
         this(ctx, -1);
     }
 
     /** With unitPx > 0, one unit is that many pixels (used with GUI units: unitPx = GUI scale). */
-    public McCanvas(GuiGraphics ctx, float unitPx) {
+    public McCanvas(GuiGraphicsExtractor ctx, float unitPx) {
         this.ctx = ctx;
         Window win = Minecraft.getInstance().getWindow();
         gs = (float) win.getGuiScale();

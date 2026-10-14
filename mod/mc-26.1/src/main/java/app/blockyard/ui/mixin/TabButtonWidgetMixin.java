@@ -1,7 +1,7 @@
 package app.blockyard.ui.mixin;
 
 import app.blockyard.ui.mc.Restyle;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.TabButton;
 import net.minecraft.network.chat.Component;
@@ -17,8 +17,8 @@ public abstract class TabButtonWidgetMixin extends AbstractWidget {
         super(x, y, width, height, message);
     }
 
-    @Inject(method = "renderWidget", at = @At("HEAD"), cancellable = true, require = 0)
-    private void blockyard$render(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "extractWidgetRenderState", at = @At("HEAD"), cancellable = true, require = 0)
+    private void blockyard$render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (!Restyle.active()) return;
         TabButton self = (TabButton) (Object) this;
         Restyle.tab(context, getX(), getY(), getWidth(), getHeight(), getMessage().getString(), self.isSelected(), isHovered() || isFocused(), this.active);

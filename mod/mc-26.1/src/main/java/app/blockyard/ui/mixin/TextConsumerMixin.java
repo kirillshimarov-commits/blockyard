@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * From 1.21.11 widgets (labels, titles, button captions) draw their text through a text consumer
  * of the draw context instead of drawText: in restyled screens it gets the launcher font too.
  */
-@Mixin(targets = "net.minecraft.client.gui.GuiGraphics$RenderingTextCollector")
+@Mixin(targets = "net.minecraft.client.gui.GuiGraphicsExtractor$RenderingTextCollector")
 public abstract class TextConsumerMixin {
     @Inject(method = "accept(Lnet/minecraft/client/gui/TextAlignment;IILnet/minecraft/client/gui/ActiveTextCollector$Parameters;Lnet/minecraft/util/FormattedCharSequence;)V",
             at = @At("HEAD"), cancellable = true, require = 0)

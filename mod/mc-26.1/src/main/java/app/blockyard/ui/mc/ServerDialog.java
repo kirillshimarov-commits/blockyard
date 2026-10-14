@@ -3,7 +3,7 @@ package app.blockyard.ui.mc;
 import app.blockyard.ui.core.DialogView;
 import app.blockyard.ui.core.Frame;
 import app.blockyard.ui.core.HomeView;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.multiplayer.ServerData;
@@ -46,9 +46,9 @@ public class ServerDialog extends UiScreen implements DialogView.Model {
     }
 
     @Override
-    protected void backdrop(GuiGraphics ctx, McCanvas c, float delta) {
+    protected void backdrop(GuiGraphicsExtractor ctx, McCanvas c, float delta) {
         parent.renderInert(ctx, delta);
-        renderBlurredBackground(ctx);
+        extractBlurredBackground(ctx);
         new McCanvas(ctx).fillScreen(0x59060510);
     }
 

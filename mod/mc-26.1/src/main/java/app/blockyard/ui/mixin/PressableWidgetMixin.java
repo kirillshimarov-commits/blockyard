@@ -1,7 +1,7 @@
 package app.blockyard.ui.mixin;
 
 import app.blockyard.ui.mc.Restyle;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
@@ -19,8 +19,8 @@ public abstract class PressableWidgetMixin extends AbstractWidget {
         super(x, y, width, height, message);
     }
 
-    @Inject(method = "renderWidget", at = @At("HEAD"), cancellable = true, require = 0)
-    private void blockyard$render(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "extractWidgetRenderState", at = @At("HEAD"), cancellable = true, require = 0)
+    private void blockyard$render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         Object self = this;
         if (!Restyle.active() || !(self.getClass() == Button.Plain.class || self instanceof CycleButton<?>)) return;
         Restyle.button(context, getX(), getY(), getWidth(), getHeight(), getMessage().getString(), this.active, isHovered(), isFocused(), this.alpha);

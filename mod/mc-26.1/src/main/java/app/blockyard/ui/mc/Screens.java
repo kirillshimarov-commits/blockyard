@@ -5,7 +5,7 @@ import app.blockyard.ui.core.Frame;
 import app.blockyard.ui.core.HomeView;
 import app.blockyard.ui.core.LoadingView;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -53,7 +53,7 @@ public final class Screens {
     }
 
     /** Draws a loading screen like the launcher's launch screen; vanilla buttons keep working. */
-    public static void loading(Screen screen, GuiGraphics ctx, String status) {
+    public static void loading(Screen screen, GuiGraphicsExtractor ctx, String status) {
         BlockyardUi.loadConfig();
         Minecraft mc = Minecraft.getInstance();
         McCanvas c = new McCanvas(ctx);
