@@ -64,8 +64,8 @@ final class TextureCache {
                 int p = px[y * img.w() + x];
                 int a = p >>> 24;
                 int r = ((p >> 16) & 255) * a / 255, g = ((p >> 8) & 255) * a / 255, b = (p & 255) * a / 255;
-                // NativeImage stores ABGR; colors premultiplied so filtering and blending stay exact.
-                ni.setColor(x, y, (a << 24) | (b << 16) | (g << 8) | r);
+                // Colors premultiplied so filtering and blending stay exact.
+                ni.setColorArgb(x, y, (a << 24) | (r << 16) | (g << 8) | b);
             }
         }
         NativeImageBackedTexture tex = new NativeImageBackedTexture(ni);

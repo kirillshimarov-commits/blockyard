@@ -61,7 +61,7 @@ public final class Selftest {
         }, always, 30);
         step("10-vanilla-video", () -> mc.setScreen(new VideoOptionsScreen(mc.currentScreen, mc, mc.options)), always, 30);
         step("11-vanilla-keybinds", () -> mc.setScreen(new KeybindsScreen(home, mc.options)), always, 30);
-        step("12-create-world", () -> CreateWorldScreen.create(mc, home), () -> mc.currentScreen instanceof CreateWorldScreen, 40);
+        step("12-create-world", () -> CreateWorldScreen.show(mc, home), () -> mc.currentScreen instanceof CreateWorldScreen, 40);
         step("13-loading", () -> press(mc.currentScreen, "selectWorld.create"), () -> !(mc.currentScreen instanceof CreateWorldScreen), 20);
         step("14-loading-later", () -> {}, always, 100);
         step("15-in-game", () -> {}, () -> mc.world != null && mc.player != null && mc.currentScreen == null, 200);

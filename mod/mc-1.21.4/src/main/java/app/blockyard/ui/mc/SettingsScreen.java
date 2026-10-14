@@ -13,7 +13,7 @@ import net.minecraft.client.gui.screen.option.VideoOptionsScreen;
 import net.minecraft.client.option.CloudRenderMode;
 import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.option.GraphicsMode;
-import net.minecraft.client.option.ParticlesMode;
+import net.minecraft.particle.ParticlesMode;
 import net.minecraft.client.option.SimpleOption;
 import net.minecraft.client.resource.language.LanguageDefinition;
 import net.minecraft.entity.player.PlayerModelPart;
@@ -225,7 +225,7 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
 
         List<SettingsView.Row> parts = new ArrayList<>();
         for (PlayerModelPart part : PlayerModelPart.values()) {
-            parts.add(new SettingsView.Toggle(partName(part), null, () -> o.isPlayerModelPartEnabled(part), v -> o.togglePlayerModelPart(part, v)));
+            parts.add(new SettingsView.Toggle(partName(part), null, () -> o.isPlayerModelPartEnabled(part), v -> o.setPlayerModelPart(part, v)));
         }
         int ph = (parts.size() + 1) / 2;
         out.add(new SettingsView.Section("Скин", "shirt", "Что видно на вашем скине", List.of(

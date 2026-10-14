@@ -258,7 +258,7 @@ public class HomeScreen extends UiScreen implements HomeView.Model {
 
     public void add() {
         if (tab == HomeView.MULTI) client.setScreen(new ServerDialog(this, -1));
-        else CreateWorldScreen.create(client, this);
+        else CreateWorldScreen.show(client, this);
     }
 
     public void settings() {
