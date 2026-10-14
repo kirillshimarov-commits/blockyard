@@ -4,10 +4,13 @@ version = rootProject.mod_version
 group = rootProject.maven_group
 base { archivesName = "blockyard-ui-${project.name}" }
 
+// The game layer: mc-<version>, or another one named by "layer" when that code fits this version.
+def layer = project.findProperty("layer") ?: "mc-${project.minecraft_version}"
+
 sourceSets {
     main {
-        java.srcDirs += [rootProject.file("common/src/main/java"), rootProject.file("mc-${project.minecraft_version}/src/main/java")]
-        resources.srcDirs += [rootProject.file("common/src/main/resources"), rootProject.file("mc-${project.minecraft_version}/src/main/resources")]
+        java.srcDirs += [rootProject.file("common/src/main/java"), rootProject.file("${layer}/src/main/java")]
+        resources.srcDirs += [rootProject.file("common/src/main/resources"), rootProject.file("${layer}/src/main/resources")]
     }
 }
 
