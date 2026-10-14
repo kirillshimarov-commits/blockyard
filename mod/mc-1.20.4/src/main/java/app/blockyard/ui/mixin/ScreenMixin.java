@@ -90,4 +90,12 @@ public abstract class ScreenMixin {
         Restyle.background(context, inWorld);
         ci.cancel();
     }
+
+    /** Options screens of 1.20.2-1.20.4 paint the dirt themselves; it becomes space too. */
+    @Inject(method = "renderBackgroundTexture(Lnet/minecraft/client/gui/DrawContext;)V", at = @At("HEAD"), cancellable = true, require = 0)
+    private void blockyard$dirt(DrawContext context, CallbackInfo ci) {
+        if (!Restyle.active()) return;
+        Restyle.background(context, client != null && client.world != null);
+        ci.cancel();
+    }
 }
