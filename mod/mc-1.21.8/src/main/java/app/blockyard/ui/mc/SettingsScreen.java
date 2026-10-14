@@ -321,6 +321,8 @@ public class SettingsScreen extends UiScreen implements SettingsView.Model {
             case PLAYERS -> "Игроки";
             case AMBIENT -> "Окружение";
             case VOICE -> "Голос и речь";
+            // UI sounds, a category of its own from 1.21.6.
+            default -> "Интерфейс";
         };
     }
 
