@@ -8,7 +8,7 @@ pluginManagement {
     }
     plugins {
         // Architectury Loom builds Fabric, Forge and NeoForge from the same Yarn-named sources.
-        id "dev.architectury.loom" version "1.11.458"
+        id "dev.architectury.loom" version "1.17.493"
     }
 }
 
