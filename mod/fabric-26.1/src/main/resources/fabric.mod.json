@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "blockyard-ui",
+  "version": "${version}",
+  "name": "Blockyard UI",
+  "description": "Меню Minecraft в стиле лаунчера Blockyard: главное меню, пауза, настройки, загрузка и все остальные экраны.",
+  "authors": ["Blockyard"],
+  "license": "MIT",
+  "environment": "client",
+  "mixins": ["blockyard-ui.mixins.json"],
+  "recommends": { "fabric-api": "*" },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": ">=26.1 <26.2",
+    "java": ">=25"
+  }
+}

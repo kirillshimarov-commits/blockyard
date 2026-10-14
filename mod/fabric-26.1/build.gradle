@@ -1,0 +1,19 @@
+plugins {
+    id "net.fabricmc.fabric-loom"
+}
+
+apply from: rootProject.file("shared.gradle")
+
+loom {
+    runs {
+        client {
+            programArgs "--width", "1920", "--height", "1080"
+        }
+    }
+}
+
+dependencies {
+    // 26.x is not obfuscated: no mappings, and nothing is remapped.
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+}

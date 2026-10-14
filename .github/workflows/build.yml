@@ -32,6 +32,16 @@ jobs:
         working-directory: mod
         run: gradle build --no-daemon
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      # 26.x is built by its own build (mod/next) on Java 25.
+      - name: Build mod 26.x
+        working-directory: mod
+        run: gradle -p next build --no-daemon
+
       - uses: actions/upload-artifact@v4
         with:
           name: blockyard-ui-mod

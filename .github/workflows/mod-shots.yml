@@ -19,13 +19,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ["fabric-1.20.1", "forge-1.20.1", "fabric-1.20.2", "neoforge-1.20.2", "fabric-1.20.4", "neoforge-1.20.4", "fabric-1.20.6", "neoforge-1.20.6", "fabric-1.21.1", "neoforge-1.21.1", "fabric-1.21.3", "neoforge-1.21.3", "fabric-1.21.4", "neoforge-1.21.4", "fabric-1.21.5", "neoforge-1.21.5", "fabric-1.21.8", "neoforge-1.21.8", "fabric-1.21.10", "neoforge-1.21.10", "fabric-1.21.11", "neoforge-1.21.11"]
+        target: ["fabric-1.20.1", "forge-1.20.1", "fabric-1.20.2", "neoforge-1.20.2", "fabric-1.20.4", "neoforge-1.20.4", "fabric-1.20.6", "neoforge-1.20.6", "fabric-1.21.1", "neoforge-1.21.1", "fabric-1.21.3", "neoforge-1.21.3", "fabric-1.21.4", "neoforge-1.21.4", "fabric-1.21.5", "neoforge-1.21.5", "fabric-1.21.8", "neoforge-1.21.8", "fabric-1.21.10", "neoforge-1.21.10", "fabric-1.21.11", "neoforge-1.21.11", "fabric-26.1", "neoforge-26.1", "fabric-26.2", "neoforge-26.2", "fabric-26.3", "neoforge-26.3"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: ${{ contains(matrix.target, '-26.') && '25' || '21' }}
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.8.1"
@@ -38,9 +38,11 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           run=${{ matrix.target }}/run
+          # 26.x lives in the build of its own (mod/next).
+          build=""; case "${{ matrix.target }}" in *-26.*) build="-p next";; esac
           mkdir -p $run
           printf 'lang:ru_ru\nonboardAccessibility:false\nguiScale:0\nskipMultiplayerWarning:true\ntutorialStep:none\nsoundCategory_master:0.0\nrenderDistance:4\nsimulationDistance:5\n' > $run/options.txt
-          timeout 40m xvfb-run -a -s "-screen 0 1920x1080x24" gradle :${{ matrix.target }}:runClient --no-daemon > $run/gradle-run.log 2>&1 || true
+          timeout 40m xvfb-run -a -s "-screen 0 1920x1080x24" gradle $build :${{ matrix.target }}:runClient --no-daemon > $run/gradle-run.log 2>&1 || true
           tail -50 $run/gradle-run.log
           ls -la $run/screenshots || true
       - name: Publish screenshots

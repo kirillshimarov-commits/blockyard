@@ -1,0 +1,33 @@
+// Applied by every 26.x loader project after its loader's plugin (see ../shared.gradle for the older ones).
+
+version = rootProject.mod_version
+group = rootProject.maven_group
+base { archivesName = "blockyard-ui-${project.name}" }
+
+def mods = rootProject.file("..")
+// The game layer: mc-<version>, or another one named by "layer" when that code fits this version.
+def layer = project.findProperty("layer") ?: "mc-${project.minecraft_version}"
+
+sourceSets {
+    main {
+        java.srcDirs += [new File(mods, "common/src/main/java"), new File(mods, "${layer}/src/main/java")]
+        resources.srcDirs += [new File(mods, "common/src/main/resources"), new File(mods, "${layer}/src/main/resources")]
+    }
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching(["fabric.mod.json", "META-INF/neoforge.mods.toml"]) {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = (project.java_version as int)
+    it.options.encoding = "UTF-8"
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion(project.java_version)
+    targetCompatibility = JavaVersion.toVersion(project.java_version)
+}

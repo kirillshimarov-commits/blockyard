@@ -1,0 +1,20 @@
+plugins {
+    id "net.neoforged.moddev"
+}
+
+apply from: rootProject.file("shared.gradle")
+
+neoForge {
+    version = project.neoforge_version
+    runs {
+        client {
+            client()
+            programArguments.addAll("--width", "1920", "--height", "1080")
+        }
+    }
+    mods {
+        blockyard_ui {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
