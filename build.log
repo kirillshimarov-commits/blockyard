@@ -1,0 +1,106 @@
+[1m[92m    Updating[0m crates.io index
+[1m[92m   Compiling[0m blockyard v0.15.0 (D:\a\blockyard\blockyard\src-tauri)
+[1m[93mwarning[0m[1m[97m: function `supports` is never used[0m
+  [1m[96m--> [0msrc\launcher\gameui.rs:41:8
+   [1m[96m|[0m
+[1m[96m41[0m [1m[96m|[0m pub fn supports(instance: &Instance) -> bool {
+   [1m[96m|[0m        [1m[93m^^^^^^^^[0m
+   [1m[96m|[0m
+   [1m[96m= [0m[1m[97mnote[0m: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+[1m[93mwarning[0m: `blockyard` (lib test) generated 1 warning (1 duplicate)
+[1m[93mwarning[0m: `blockyard` (lib) generated 1 warning
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 1m 03s
+[1m[92m     Running[0m unittests src\lib.rs (src-tauri\target\debug\deps\blockyard_lib-9d043750af6d279d.exe)
+
+running 23 tests
+test launcher::bisect::tests::reads_forge_dependencies ... ok
+test launcher::bisect::tests::reads_fabric_dependencies ... ok
+test launcher::auth::tests::parses_device_code_response ... ok
+test launcher::bisect::tests::halving_keeps_dependencies_together ... ok
+test launcher::crash::tests::summarizes_crash_report ... ok
+test launcher::crash::tests::explains_common_crashes ... ok
+test launcher::forge::tests::neoforge_prefixes ... ok
+test launcher::forge::tests::parses_maven_metadata ... ok
+test launcher::launch::tests::splits_command_lines ... ok
+test launcher::modpack::tests::rejects_escaping_paths ... ok
+test launcher::launch::tests::offline_uuid_matches_vanilla ... ok
+test launcher::mods::tests::titles_normalize ... ok
+test launcher::mojang::tests::library_dedupe_keeps_classifiers_apart ... ok
+test launcher::mojang::tests::maven_paths ... ok
+test launcher::mojang::tests::rules ... ok
+test launcher::tunnel::tests::finds_lan_port ... ok
+test launcher::news::tests::parses_feed ... ok
+test launcher::tunnel::tests::picks_join_arguments ... ok
+test launcher::updater::tests::compares_versions ... ok
+test launcher::yggdrasil::tests::vouches_for_any_player ... ok
+test launcher::gameui::tests::detects_menu_mods ... ok
+test launcher::yggdrasil::tests::serves_http ... ok
+test launcher::tunnel::tests::tunnel_round_trip ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+[1m[92m     Running[0m unittests src\main.rs (src-tauri\target\debug\deps\blockyard-198e047e75da40d8.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[92m   Doc-tests[0m blockyard_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+> blockyard@0.15.0 tauri D:\a\blockyard\blockyard
+> tauri "build"
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `pnpm build`
+
+> blockyard@0.15.0 build D:\a\blockyard\blockyard
+> tsc && vite build
+
+[36mvite v7.3.7 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 63 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.41 kB[22m[1m[22m[2m │ gzip:   0.27 kB[22m
+[2mdist/[22m[35massets/index-BTmq8D9R.css  [39m[1m[2m 42.13 kB[22m[1m[22m[2m │ gzip:   9.26 kB[22m
+[2mdist/[22m[36massets/index-vBTTKAEb.js   [39m[1m[2m373.58 kB[22m[1m[22m[2m │ gzip: 116.10 kB[22m
+[32m✓ built in 1.71s[39m
+[1m[92m   Compiling[0m blockyard v0.15.0 (D:\a\blockyard\blockyard\src-tauri)
+[1m[93mwarning[0m[1m[97m: function `supports` is never used[0m
+  [1m[96m--> [0msrc\launcher\gameui.rs:41:8
+   [1m[96m|[0m
+[1m[96m41[0m [1m[96m|[0m pub fn supports(instance: &Instance) -> bool {
+   [1m[96m|[0m        [1m[93m^^^^^^^^[0m
+   [1m[96m|[0m
+   [1m[96m= [0m[1m[97mnote[0m: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+[1m[93mwarning[0m: `blockyard` (lib) generated 1 warning
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 5m 19s
+       Built application at: D:\a\blockyard\blockyard\src-tauri\target\release\blockyard.exe
+        Info Patching D:\a\blockyard\blockyard\src-tauri\target\release\blockyard.exe with bundle type information: nsis
+        Info Verifying NSIS package
+ Downloading https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip
+        Info validating hash
+        Info extracting NSIS
+ Downloading https://github.com/tauri-apps/nsis-tauri-utils/releases/download/nsis_tauri_utils-v0.5.3/nsis_tauri_utils.dll
+        Info validating hash
+        Info Target: x64
+     Running makensis to produce D:\a\blockyard\blockyard\src-tauri\target\release\bundle\nsis\Blockyard_0.15.0_x64-setup.exe
+        Info Patching D:\a\blockyard\blockyard\src-tauri\target\release\blockyard.exe with bundle type information: msi
+        Info Verifying wix package
+ Downloading https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip
+        Info validating hash
+        Info extracting WIX
+        Info Target: x64
+     Running candle for "D:\\a\\blockyard\\blockyard\\src-tauri\\target\\release\\wix\\x64\\main.wxs"
+     Running light to produce D:\a\blockyard\blockyard\src-tauri\target\release\bundle\msi\Blockyard_0.15.0_x64_en-US.msi
+    Finished 2 bundles at:
+        D:\a\blockyard\blockyard\src-tauri\target\release\bundle\nsis\Blockyard_0.15.0_x64-setup.exe (5.86 MiB)
+        D:\a\blockyard\blockyard\src-tauri\target\release\bundle\msi\Blockyard_0.15.0_x64_en-US.msi (16.82 MiB)
+
