@@ -1,0 +1,546 @@
+
+Welcome to Gradle 9.8.1!
+
+Here are the highlights of this release:
+ - Java 27 support
+ - Maven mirror settings reuse
+ - Linked problem locations in build output
+
+For more details see https://docs.gradle.org/9.8.1/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :fabric-1.20.1
+Architectury Loom: 1.17.493
+
+> Configure project :forge-1.20.1
+:forge patched jars not up to date. current version: 9
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 575056ns
+:step 2/10 - downloadServer
+:downloadServer done in 15553ns
+:step 3/10 - extractServer with net.minecraftforge:installertools:1.3.2:fatjar
+:extractServer done in 355ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 96ms
+:step 5/10 - mergeMappings with net.minecraftforge:installertools:1.2.0:fatjar
+:mergeMappings done in 1s
+:step 6/10 - stripClient
+:stripClient done in 542ms
+:step 7/10 - stripServer
+:stripServer done in 359ms
+:step 8/10 - merge with net.minecraftforge:mergetool:1.1.7:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 1ms
+:step 10/10 - rename with net.minecraftforge:ForgeAutoRenamingTool:1.0.2:all
+:rename done in 6s
+:patching jars
+:patched jars in 10s
+:access transforming minecraft
+[19:48:16] [main/INFO]: Access Transformer processor running version 8.0.5+67+master.d58c7dfe
+[19:48:16] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.20.1/forge/1.20.1-47.4.0/minecraft-merged-srg-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.20.1/forge/1.20.1-47.4.0/minecraft-merged-srg-at-patched.jar, --atFile, /tmp/at-conf14350893317522130862.cfg]
+[19:48:16] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.20.1/forge/1.20.1-47.4.0/minecraft-merged-srg-patched.jar
+[19:48:16] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.20.1/forge/1.20.1-47.4.0/minecraft-merged-srg-at-patched.jar
+[19:48:16] [main/INFO]: Transformer file /tmp/at-conf14350893317522130862.cfg
+[19:48:16] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.20.1/forge/1.20.1-47.4.0/minecraft-merged-srg-at-patched.jar, overwriting
+[19:48:19] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.20.1/forge/1.20.1-47.4.0/minecraft-merged-srg-at-patched.jar
+:access transformed minecraft in 6s
+:remapping minecraft (TinyRemapper, srg -> official)
+
+> Configure project :neoforge-1.20.2
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 13090ns
+:step 2/10 - downloadServer
+:downloadServer done in 5769ns
+:step 3/10 - extractServer with net.minecraftforge:installertools:1.3.2:fatjar
+:extractServer done in 301ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 41ms
+:step 5/10 - mergeMappings with net.minecraftforge:installertools:1.3.2:fatjar
+:mergeMappings done in 1s
+:step 6/10 - stripClient
+:stripClient done in 439ms
+:step 7/10 - stripServer
+:stripServer done in 321ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.0:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 392234ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:1.0.7:all
+:rename done in 5s
+:patching jars
+:patched jars in 6s
+:access transforming minecraft
+[19:49:03] [main/INFO]: Access Transformer processor running version 8.0.5+67+master.d58c7dfe
+[19:49:03] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.20.2/neoforge/20.2.93/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.20.2/neoforge/20.2.93/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf12131921999003739778.cfg, --atFile, /tmp/at-conf6460450350893945300.cfg]
+[19:49:03] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.20.2/neoforge/20.2.93/minecraft-merged-mojang-patched.jar
+[19:49:03] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.20.2/neoforge/20.2.93/minecraft-merged-mojang-at-patched.jar
+[19:49:03] [main/INFO]: Transformer file /tmp/at-conf12131921999003739778.cfg
+[19:49:03] [main/INFO]: Transformer file /tmp/at-conf6460450350893945300.cfg
+[19:49:03] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.20.2/neoforge/20.2.93/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:49:06] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.20.2/neoforge/20.2.93/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 3s
+:remapping minecraft (TinyRemapper, mojang -> official)
+Mapping source name conflicts detected:
+  adq METHOD a ((Lso;)V) -> [adq/method_52296, adp/method_52295]
+    fixable: replaced with method_52296
+  ads METHOD a ((Lso;)V) -> [adp/method_52295, ads/method_52296]
+    fixable: replaced with method_52296
+  net/neoforged/neoforge/network/custom/payload/SimpleQueryPayload METHOD a ((Lso;)V) -> [adp/method_52295, net/neoforged/neoforge/network/custom/payload/SimpleQueryPayload/method_52296]
+    fixable: replaced with method_52295
+  adp METHOD a ((Lso;)V) -> [adp/method_52296, adp/method_52295]
+    fixable: replaced with method_52295
+  adr METHOD a ((Lso;)V) -> [adp/method_52295, adr/method_52296]
+    fixable: replaced with method_52295
+
+> Configure project :neoforge-1.20.4
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 15343ns
+:step 2/10 - downloadServer
+:downloadServer done in 10245ns
+:step 3/10 - extractServer with net.minecraftforge:installertools:1.3.2:fatjar
+:extractServer done in 326ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 54ms
+:step 5/10 - mergeMappings with net.minecraftforge:installertools:1.3.2:fatjar
+:mergeMappings done in 1s
+:step 6/10 - stripClient
+:stripClient done in 460ms
+:step 7/10 - stripServer
+:stripServer done in 335ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.2:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 388959ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:1.0.11:all
+:rename done in 6s
+:patching jars
+:patched jars in 7s
+:access transforming minecraft
+[19:49:47] [main/INFO]: Access Transformer processor running version 8.0.5+67+master.d58c7dfe
+[19:49:47] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.20.4/neoforge/20.4.251/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.20.4/neoforge/20.4.251/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf10992558179570151593.cfg, --atFile, /tmp/at-conf8009801142653556928.cfg]
+[19:49:47] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.20.4/neoforge/20.4.251/minecraft-merged-mojang-patched.jar
+[19:49:47] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.20.4/neoforge/20.4.251/minecraft-merged-mojang-at-patched.jar
+[19:49:47] [main/INFO]: Transformer file /tmp/at-conf10992558179570151593.cfg
+[19:49:47] [main/INFO]: Transformer file /tmp/at-conf8009801142653556928.cfg
+[19:49:47] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.20.4/neoforge/20.4.251/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:49:51] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.20.4/neoforge/20.4.251/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 4s
+:remapping minecraft (TinyRemapper, mojang -> official)
+
+> Configure project :neoforge-1.20.6
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 17466ns
+:step 2/10 - downloadServer
+:downloadServer done in 11076ns
+:step 3/10 - extractServer with net.neoforged.installertools:installertools:2.1.2:fatjar
+:extractServer done in 339ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 64ms
+:step 5/10 - mergeMappings with net.neoforged.installertools:installertools:2.1.2:fatjar
+:mergeMappings done in 1s
+:step 6/10 - stripClient
+:stripClient done in 486ms
+:step 7/10 - stripServer
+:stripServer done in 366ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.3:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 453726ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:2.0.3:all
+:rename done in 5s
+:patching jars
+:patched jars in 7s
+:access transforming minecraft
+SLF4J: No SLF4J providers were found.
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+[19:50:41] [main/INFO]: Access Transformer processor running version null
+[19:50:41] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.20.6/neoforge/20.6.141/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.20.6/neoforge/20.6.141/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf14864866954453395898.cfg, --atFile, /tmp/at-conf10548606628181713671.cfg]
+[19:50:41] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.20.6/neoforge/20.6.141/minecraft-merged-mojang-patched.jar
+[19:50:41] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.20.6/neoforge/20.6.141/minecraft-merged-mojang-at-patched.jar
+[19:50:41] [main/INFO]: Transformer file /tmp/at-conf14864866954453395898.cfg
+[19:50:41] [main/INFO]: Transformer file /tmp/at-conf10548606628181713671.cfg
+[19:50:41] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.20.6/neoforge/20.6.141/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:50:45] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.20.6/neoforge/20.6.141/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 6s
+:remapping minecraft (TinyRemapper, mojang -> official)
+
+> Configure project :neoforge-1.21.1
+:forge patched jars not up to date. current version: 9
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 10716ns
+:step 2/10 - downloadServer
+:downloadServer done in 5618ns
+:step 3/10 - extractServer with net.neoforged.installertools:installertools:2.1.2:fatjar
+:extractServer done in 347ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 168ms
+:step 5/10 - mergeMappings with net.neoforged.installertools:installertools:2.1.2:fatjar
+:mergeMappings done in 2s
+:step 6/10 - stripClient
+:stripClient done in 448ms
+:step 7/10 - stripServer
+:stripServer done in 355ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.3:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 515514ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:2.0.3:all
+:rename done in 5s
+:patching jars
+:patched jars in 9s
+:access transforming minecraft
+SLF4J: No SLF4J providers were found.
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+[19:51:26] [main/INFO]: Access Transformer processor running version null
+[19:51:26] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.21.1/neoforge/21.1.209/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.21.1/neoforge/21.1.209/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf6060381650392550671.cfg]
+[19:51:26] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.21.1/neoforge/21.1.209/minecraft-merged-mojang-patched.jar
+[19:51:26] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.21.1/neoforge/21.1.209/minecraft-merged-mojang-at-patched.jar
+[19:51:26] [main/INFO]: Transformer file /tmp/at-conf6060381650392550671.cfg
+[19:51:26] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.21.1/neoforge/21.1.209/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:51:29] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.21.1/neoforge/21.1.209/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 3s
+:remapping minecraft (TinyRemapper, mojang -> official)
+
+> Configure project :neoforge-1.21.10
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 11518ns
+:step 2/10 - downloadServer
+:downloadServer done in 5418ns
+:step 3/10 - extractServer with net.neoforged.installertools:installertools:3.0.13:fatjar
+:extractServer done in 361ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 125ms
+:step 5/10 - mergeMappings with net.neoforged.installertools:installertools:3.0.13:fatjar
+:mergeMappings done in 2s
+:step 6/10 - stripClient
+:stripClient done in 552ms
+:step 7/10 - stripServer
+:stripServer done in 529ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.7:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 446645ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:2.0.15:all
+:rename done in 5s
+:patching jars
+:patched jars in 5s
+:access transforming minecraft
+SLF4J: No SLF4J providers were found.
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+[19:52:12] [main/INFO]: Access Transformer processor running version null
+[19:52:12] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.21.10/neoforge/21.10.64/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.21.10/neoforge/21.10.64/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf590985017454233775.cfg, --atFile, /tmp/at-conf12865106894351007982.cfg]
+[19:52:12] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.21.10/neoforge/21.10.64/minecraft-merged-mojang-patched.jar
+[19:52:12] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.21.10/neoforge/21.10.64/minecraft-merged-mojang-at-patched.jar
+[19:52:12] [main/INFO]: Transformer file /tmp/at-conf590985017454233775.cfg
+[19:52:12] [main/INFO]: Transformer file /tmp/at-conf12865106894351007982.cfg
+[19:52:12] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.21.10/neoforge/21.10.64/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:52:15] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.21.10/neoforge/21.10.64/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 4s
+:remapping minecraft (TinyRemapper, mojang -> official)
+Mapping source name conflicts detected:
+  awy METHOD I (()I) -> [awy/method_5691, cew/method_6028]
+    fixable: replaced with method_5691
+  hep METHOD I (()I) -> [cew/method_6028, hep/method_5691]
+    fixable: replaced with method_5691
+  cew METHOD I (()I) -> [cew/method_6028, cew/method_5691]
+    fixable: replaced with method_6028
+  czl METHOD I (()I) -> [cew/method_6028, czl/method_5691]
+    fixable: replaced with method_5691
+Mapping source name conflicts detected:
+  hep METHOD I (()I) -> [hep/getPermissionLevel, cew/getHandSwingDuration]
+    fixable: replaced with getPermissionLevel
+  czl METHOD I (()I) -> [cew/getHandSwingDuration, czl/getPermissionLevel]
+    fixable: replaced with getPermissionLevel
+  cew METHOD I (()I) -> [cew/getPermissionLevel, cew/getHandSwingDuration]
+    fixable: replaced with getHandSwingDuration
+  awy METHOD I (()I) -> [cew/getHandSwingDuration, awy/getPermissionLevel]
+    fixable: replaced with getPermissionLevel
+Mapping source name conflicts detected:
+  cew METHOD I (()I) -> [cew/getCurrentSwingDuration, cew/getPermissionLevel]
+    fixable: replaced with getCurrentSwingDuration
+  awy METHOD I (()I) -> [cew/getCurrentSwingDuration, awy/getPermissionLevel]
+    fixable: replaced with getPermissionLevel
+  czl METHOD I (()I) -> [cew/getCurrentSwingDuration, czl/getPermissionLevel]
+    fixable: replaced with getPermissionLevel
+  hep METHOD I (()I) -> [cew/getCurrentSwingDuration, hep/getPermissionLevel]
+    fixable: replaced with getPermissionLevel
+
+> Configure project :neoforge-1.21.11
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 13941ns
+:step 2/10 - downloadServer
+:downloadServer done in 6670ns
+:step 3/10 - extractServer with net.neoforged.installertools:installertools:4.0.7:fatjar
+:extractServer done in 332ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 78ms
+:step 5/10 - mergeMappings with net.neoforged.installertools:installertools:4.0.7:fatjar
+:mergeMappings done in 2s
+:step 6/10 - stripClient
+:stripClient done in 570ms
+:step 7/10 - stripServer
+:stripServer done in 532ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.7:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 493155ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:2.0.17:all
+:rename done in 6s
+:patching jars
+:patched jars in 3s
+:access transforming minecraft
+SLF4J: No SLF4J providers were found.
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+[19:52:58] [main/INFO]: Access Transformer processor running version null
+[19:52:58] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.21.11/neoforge/21.11.45/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.21.11/neoforge/21.11.45/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf12221172445014762097.cfg, --atFile, /tmp/at-conf15129805863212243349.cfg]
+[19:52:58] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.21.11/neoforge/21.11.45/minecraft-merged-mojang-patched.jar
+[19:52:58] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.21.11/neoforge/21.11.45/minecraft-merged-mojang-at-patched.jar
+[19:52:58] [main/INFO]: Transformer file /tmp/at-conf12221172445014762097.cfg
+[19:52:58] [main/INFO]: Transformer file /tmp/at-conf15129805863212243349.cfg
+[19:52:58] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.21.11/neoforge/21.11.45/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:53:02] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.21.11/neoforge/21.11.45/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 4s
+:remapping minecraft (TinyRemapper, mojang -> official)
+
+> Configure project :neoforge-1.21.3
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 17526ns
+:step 2/10 - downloadServer
+:downloadServer done in 9294ns
+:step 3/10 - extractServer with net.neoforged.installertools:installertools:2.1.2:fatjar
+:extractServer done in 334ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 73ms
+:step 5/10 - mergeMappings with net.neoforged.installertools:installertools:2.1.2:fatjar
+:mergeMappings done in 1s
+:step 6/10 - stripClient
+:stripClient done in 480ms
+:step 7/10 - stripServer
+:stripServer done in 415ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.3:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 477642ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:2.0.4:all
+:rename done in 5s
+:patching jars
+:patched jars in 8s
+:access transforming minecraft
+SLF4J: No SLF4J providers were found.
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+[19:53:45] [main/INFO]: Access Transformer processor running version null
+[19:53:45] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.21.3/neoforge/21.3.97/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.21.3/neoforge/21.3.97/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf4038645634314162998.cfg]
+[19:53:45] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.21.3/neoforge/21.3.97/minecraft-merged-mojang-patched.jar
+[19:53:45] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.21.3/neoforge/21.3.97/minecraft-merged-mojang-at-patched.jar
+[19:53:45] [main/INFO]: Transformer file /tmp/at-conf4038645634314162998.cfg
+[19:53:45] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.21.3/neoforge/21.3.97/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:53:49] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.21.3/neoforge/21.3.97/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 3s
+:remapping minecraft (TinyRemapper, mojang -> official)
+
+> Configure project :neoforge-1.21.4
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 14472ns
+:step 2/10 - downloadServer
+:downloadServer done in 5759ns
+:step 3/10 - extractServer with net.neoforged.installertools:installertools:2.1.2:fatjar
+:extractServer done in 352ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 73ms
+:step 5/10 - mergeMappings with net.neoforged.installertools:installertools:2.1.2:fatjar
+:mergeMappings done in 1s
+:step 6/10 - stripClient
+:stripClient done in 505ms
+:step 7/10 - stripServer
+:stripServer done in 353ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.3:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 373206ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:2.0.5:all
+:rename done in 5s
+:patching jars
+:patched jars in 8s
+:access transforming minecraft
+SLF4J: No SLF4J providers were found.
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+[19:54:29] [main/INFO]: Access Transformer processor running version null
+[19:54:29] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.21.4/neoforge/21.4.158/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.21.4/neoforge/21.4.158/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf11000035022920498463.cfg, --atFile, /tmp/at-conf17334103480599728158.cfg]
+[19:54:29] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.21.4/neoforge/21.4.158/minecraft-merged-mojang-patched.jar
+[19:54:29] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.21.4/neoforge/21.4.158/minecraft-merged-mojang-at-patched.jar
+[19:54:29] [main/INFO]: Transformer file /tmp/at-conf11000035022920498463.cfg
+[19:54:29] [main/INFO]: Transformer file /tmp/at-conf17334103480599728158.cfg
+[19:54:29] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.21.4/neoforge/21.4.158/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:54:33] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.21.4/neoforge/21.4.158/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 3s
+:remapping minecraft (TinyRemapper, mojang -> official)
+Mapping source name conflicts detected:
+  bvi METHOD F (()I) -> [bvi/method_6028, bvi/method_52371]
+    fixable: replaced with method_6028
+  are METHOD F (()I) -> [bvi/method_6028, are/method_52371]
+    fixable: replaced with method_52371
+Mapping source name conflicts detected:
+  are METHOD F (()I) -> [bvi/getHandSwingDuration, are/getViewDistance]
+    fixable: replaced with getViewDistance
+  bvi METHOD F (()I) -> [bvi/getViewDistance, bvi/getHandSwingDuration]
+    fixable: replaced with getHandSwingDuration
+Mapping source name conflicts detected:
+  are METHOD F (()I) -> [are/requestedViewDistance, bvi/getCurrentSwingDuration]
+    fixable: replaced with requestedViewDistance
+  bvi METHOD F (()I) -> [bvi/requestedViewDistance, bvi/getCurrentSwingDuration]
+    fixable: replaced with getCurrentSwingDuration
+
+> Configure project :neoforge-1.21.5
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 11547ns
+:step 2/10 - downloadServer
+:downloadServer done in 6420ns
+:step 3/10 - extractServer with net.neoforged.installertools:installertools:2.1.2:fatjar
+:extractServer done in 327ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 91ms
+:step 5/10 - mergeMappings with net.neoforged.installertools:installertools:2.1.2:fatjar
+:mergeMappings done in 2s
+:step 6/10 - stripClient
+:stripClient done in 489ms
+:step 7/10 - stripServer
+:stripServer done in 406ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.3:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 469350ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:2.0.8:all
+:rename done in 6s
+:patching jars
+:patched jars in 8s
+:access transforming minecraft
+SLF4J: No SLF4J providers were found.
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+[19:55:16] [main/INFO]: Access Transformer processor running version null
+[19:55:16] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.21.5/neoforge/21.5.98/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.21.5/neoforge/21.5.98/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf16160210216273593471.cfg, --atFile, /tmp/at-conf15853736418631016121.cfg]
+[19:55:16] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.21.5/neoforge/21.5.98/minecraft-merged-mojang-patched.jar
+[19:55:16] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.21.5/neoforge/21.5.98/minecraft-merged-mojang-at-patched.jar
+[19:55:16] [main/INFO]: Transformer file /tmp/at-conf16160210216273593471.cfg
+[19:55:16] [main/INFO]: Transformer file /tmp/at-conf15853736418631016121.cfg
+[19:55:16] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.21.5/neoforge/21.5.98/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:55:20] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.21.5/neoforge/21.5.98/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 4s
+:remapping minecraft (TinyRemapper, mojang -> official)
+
+> Configure project :neoforge-1.21.8
+:downloading minecraft libraries, this may take a while...
+:executing 10 MCP steps
+:step 1/10 - downloadClient
+:downloadClient done in 11948ns
+:step 2/10 - downloadServer
+:downloadServer done in 5288ns
+:step 3/10 - extractServer with net.neoforged.installertools:installertools:2.1.2:fatjar
+:extractServer done in 344ms
+:step 4/10 - downloadClientMappings
+:downloadClientMappings done in 86ms
+:step 5/10 - mergeMappings with net.neoforged.installertools:installertools:2.1.2:fatjar
+:mergeMappings done in 2s
+:step 6/10 - stripClient
+:stripClient done in 502ms
+:step 7/10 - stripServer
+:stripServer done in 371ms
+:step 8/10 - merge with net.neoforged:mergetool:2.0.7:fatjar
+:merge done in 3s
+:downloading minecraft libraries, this may take a while...
+:step 9/10 - listLibraries
+:listLibraries done in 471362ns
+:step 10/10 - rename with net.neoforged:AutoRenamingTool:2.0.8:all
+:rename done in 6s
+:patching jars
+:patched jars in 4s
+:access transforming minecraft
+SLF4J: No SLF4J providers were found.
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See https://www.slf4j.org/codes.html#noProviders for further details.
+[19:55:58] [main/INFO]: Access Transformer processor running version null
+[19:55:58] [main/INFO]: Command line arguments [--inJar, /home/runner/.gradle/caches/fabric-loom/1.21.8/neoforge/21.8.54/minecraft-merged-mojang-patched.jar, --outJar, /home/runner/.gradle/caches/fabric-loom/1.21.8/neoforge/21.8.54/minecraft-merged-mojang-at-patched.jar, --atFile, /tmp/at-conf2024610921806500703.cfg, --atFile, /tmp/at-conf11156307532523114719.cfg]
+[19:55:58] [main/INFO]: Reading from /home/runner/.gradle/caches/fabric-loom/1.21.8/neoforge/21.8.54/minecraft-merged-mojang-patched.jar
+[19:55:58] [main/INFO]: Writing to /home/runner/.gradle/caches/fabric-loom/1.21.8/neoforge/21.8.54/minecraft-merged-mojang-at-patched.jar
+[19:55:58] [main/INFO]: Transformer file /tmp/at-conf2024610921806500703.cfg
+[19:55:58] [main/INFO]: Transformer file /tmp/at-conf11156307532523114719.cfg
+[19:55:58] [main/WARN]: Found existing output jar /home/runner/.gradle/caches/fabric-loom/1.21.8/neoforge/21.8.54/minecraft-merged-mojang-at-patched.jar, overwriting
+[19:56:01] [main/INFO]: JAR transformation complete /home/runner/.gradle/caches/fabric-loom/1.21.8/neoforge/21.8.54/minecraft-merged-mojang-at-patched.jar
+:access transformed minecraft in 3s
+:remapping minecraft (TinyRemapper, mojang -> official)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using of the official minecraft mappings is at your own risk!
+Please make sure to read and understand the following license:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# (c) 2020 Microsoft Corporation. These mappings are provided "as-is" and you bear the risk of using them. You may copy and use the mappings for development purposes, but you may not redistribute the mappings complete and unmodified. Microsoft makes no warranties, express or implied, with respect to the mappings provided here.  Use and modification of this document or the source code (in any form) of Minecraft: Java Edition is governed by the Minecraft End User License Agreement available at https://account.mojang.com/documents/minecraft_eula.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+> Task :fabric-1.21.11:migrateMappings
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1792007117711.json
+
+BUILD SUCCESSFUL in 11m 9s
+1 actionable task: 1 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.1/userguide/configuration_cache_enabling.html
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :fabric-1.20.1
+Architectury Loom: 1.17.493
+
+> Task :fabric-1.21.11:migrateMappings
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1792007784118.json
+
+BUILD SUCCESSFUL in 14s
+1 actionable task: 1 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.1/userguide/configuration_cache_enabling.html
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :fabric-1.20.1
+Architectury Loom: 1.17.493
+
+> Task :fabric-1.21.11:migrateMappings
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1792007798887.json
+
+BUILD SUCCESSFUL in 14s
+1 actionable task: 1 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.1/userguide/configuration_cache_enabling.html
