@@ -107,6 +107,8 @@ async fn bind_endpoint(alpn: bool) -> Result<Endpoint> {
 
 pub struct Host {
     pub instance_id: String,
+    /// Port of the opened world the friends are forwarded to.
+    pub lan_port: u16,
     pub invite: String,
     endpoint: Endpoint,
     peers: Arc<Mutex<HashMap<EndpointId, Connection>>>,
@@ -155,7 +157,7 @@ impl Host {
                 }
             }
         });
-        Ok(Host { instance_id: instance.id.clone(), invite, endpoint, peers, task })
+        Ok(Host { instance_id: instance.id.clone(), lan_port, invite, endpoint, peers, task })
     }
 
     pub fn peers(&self) -> Vec<LinkInfo> {

@@ -327,19 +327,7 @@ async fn run_game(
             let mut lines = BufReader::new(stream).lines();
             while let Ok(Some(line)) = lines.next_line().await {
                 if let Some(port) = tunnel::parse_lan_port(&line) {
-                    app.state::<Tunnels>().lan_ports.lock().unwrap().insert(instance_id.clone(), port);
-                    let _ = app.emit("lan-opened", LanEvent { instance_id: instance_id.clone(), port });
-                    // The game covers the launcher, so hand the invite code to the game itself:
-                    // Blockyard UI shows it in the pause menu.
-                    let (app, instance_id, file) = (app.clone(), instance_id.clone(), invite_file.clone());
-                    tauri::async_runtime::spawn(async move {
-                        if let Ok(code) = create_invite(&instance_id, &app.state::<Tunnels>()).await {
-                            if let Some(dir) = file.parent() {
-                                let _ = std::fs::create_dir_all(dir);
-                            }
-                            let _ = std::fs::write(&file, code);
-                        }
-                    });
+                    lan_opened(&app, &instance_id, port, &invite_file);
                 }
                 {
                     let mut t = tail.lock().unwrap();
@@ -350,6 +338,23 @@ async fn run_game(
                 }
                 let _ = app.emit("game-log", LogEvent { instance_id: instance_id.clone(), line });
             }
+        });
+    }
+
+    // Many modpacks keep INFO lines out of the console, so the opened world is also looked for
+    // in the log file the game always writes.
+    let game_running = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    {
+        let (app, instance_id, invite_file) = (app.clone(), inst.id.clone(), invite_file.clone());
+        let log_file = prepared.game_dir.join("logs").join("latest.log");
+        let running = game_running.clone();
+        tauri::async_runtime::spawn(async move {
+            watch_log_file(&log_file, &running, |line| {
+                if let Some(port) = tunnel::parse_lan_port(line) {
+                    lan_opened(&app, &instance_id, port, &invite_file);
+                }
+            })
+            .await;
         });
     }
 
@@ -370,7 +375,8 @@ async fn run_game(
         }
     }
     Ok(()) }.await;
-    let played = started.elapsed().map(|d| d.as_secs()).unwrap_or(0);
+    game_running.store(false, std::sync::atomic::Ordering::Relaxed);
+    let played =started.elapsed().map(|d| d.as_secs()).unwrap_or(0);
     if let Err(e) = instance::add_play_time(&inst.id, played) {
         eprintln!("play time: {e:#}");
     }
@@ -715,6 +721,57 @@ async fn tunnel_invite(instance_id: String, tunnels: State<'_, Tunnels>) -> CmdR
 }
 
 /// Starts hosting the instance's open LAN world (or reuses the running host) and returns the code.
+/// A world was opened to LAN: remembers its port and hands the invite code to the game, which
+/// covers the launcher (Blockyard UI shows it in the pause menu).
+fn lan_opened(app: &AppHandle, instance_id: &str, port: u16, invite_file: &std::path::Path) {
+    // The console and the log file both report it: act once per port.
+    let known = app.state::<Tunnels>().lan_ports.lock().unwrap().insert(instance_id.to_string(), port);
+    if known == Some(port) {
+        return;
+    }
+    let _ = app.emit("lan-opened", LanEvent { instance_id: instance_id.to_string(), port });
+    let (app, instance_id, file) = (app.clone(), instance_id.to_string(), invite_file.to_path_buf());
+    tauri::async_runtime::spawn(async move {
+        // "!" marks an error, which the pause menu shows instead of waiting for a code.
+        let text = create_invite(&instance_id, &app.state::<Tunnels>()).await.unwrap_or_else(|e| format!("!{e}"));
+        if let Some(dir) = file.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(&file, text);
+    });
+}
+
+/// Calls `on_line` for every line the game appends to its log file while `running` is set.
+/// The game rotates the file as it starts, so a shrinking file is read again from the start.
+async fn watch_log_file(path: &std::path::Path, running: &std::sync::atomic::AtomicBool, mut on_line: impl FnMut(&str)) {
+    use std::io::{Read, Seek, SeekFrom};
+    // Lines already there are from an earlier run.
+    let mut pos = std::fs::metadata(path).map_or(0, |m| m.len());
+    let mut partial = String::new();
+    while running.load(std::sync::atomic::Ordering::Relaxed) {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        let Ok(mut file) = std::fs::File::open(path) else { continue };
+        let len = file.metadata().map_or(0, |m| m.len());
+        if len < pos {
+            pos = 0;
+            partial.clear();
+        }
+        if len == pos || file.seek(SeekFrom::Start(pos)).is_err() {
+            continue;
+        }
+        let mut bytes = Vec::new();
+        if file.take(len - pos).read_to_end(&mut bytes).is_err() {
+            continue;
+        }
+        pos = len;
+        partial.push_str(&String::from_utf8_lossy(&bytes));
+        while let Some(end) = partial.find('\n') {
+            let line: String = partial.drain(..=end).collect();
+            on_line(line.trim_end());
+        }
+    }
+}
+
 async fn create_invite(instance_id: &str, tunnels: &Tunnels) -> CmdResult<String> {
     let instance_id = instance_id.to_string();
     let port = tunnels
@@ -725,7 +782,8 @@ async fn create_invite(instance_id: &str, tunnels: &Tunnels) -> CmdResult<String
         .copied()
         .ok_or("Сначала откройте мир для сети: в игре Esc → «Открыть для сети»")?;
     let mut host = tunnels.host.lock().await;
-    if let Some(h) = host.as_ref().filter(|h| h.instance_id == instance_id) {
+    // A world reopened on another port needs a new host.
+    if let Some(h) = host.as_ref().filter(|h| h.instance_id == instance_id && h.lan_port == port) {
         return Ok(h.invite.clone());
     }
     if let Some(old) = host.take() {

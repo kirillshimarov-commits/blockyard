@@ -7,7 +7,7 @@ public final class PauseView {
 
         boolean singleplayer();
 
-        /** null when not hosting; "" while the code is being created. */
+        /** null when not hosting; "" while the code is being created; "!" and the reason when it failed. */
         String invite();
 
         boolean copiedRecently();
@@ -35,6 +35,7 @@ public final class PauseView {
         float bh = Kit.wideBtnH(0), gap = 2.5f;
         String invite = m.invite();
         boolean code = invite != null && !invite.isEmpty();
+        boolean failed = code && invite.startsWith("!");
         float inviteH = code ? 3.5f * 2 + Kit.lh(Kit.SUB) + 1 + Kit.lh(Kit.BODY_B) : 0;
         float h = pad * 2 + Kit.lh(Kit.H2_PAUSE) + 1 + Kit.lh(Kit.BODY) + 6 + (bh + gap) * 4 - gap + (code ? inviteH + gap : 0);
         float x = (f.vw - w) / 2, y = (270 - h) / 2 + (1 - appear) * 5;
@@ -53,13 +54,19 @@ public final class PauseView {
         iy += bh + gap;
         if (m.singleplayer()) {
             Kit.wideBtn(f, "Настройки", ix, iy, half, 0, m::settings);
-            String label = invite == null ? "Пригласить друга" : code ? "Мир открыт" : "Создаём код…";
+            String label = invite == null ? "Пригласить друга" : failed ? "Нет кода" : failed ? "Нет кода" : code ? "Мир открыт" : "Создаём код…";
             Kit.wideBtn(f, label, ix + half + gap, iy, half, 0, m::openToFriend);
         } else {
             Kit.wideBtn(f, "Настройки", ix, iy, iw, 0, m::settings);
         }
         iy += bh + gap;
-        if (code) {
+        if (failed) {
+            // The launcher could not create the code: say why rather than wait forever.
+            c.fillRound(ix, iy, iw, inviteH, 4, Kit.a(0.12f, 0xF0566A), Kit.a(0.12f, 0xF0566A), 0.25f, Kit.a(0.25f, 0xF0566A));
+            c.text("Не удалось создать код для друга", Kit.SUB, ix + 4, iy + 3.5f, Kit.MUTED);
+            c.text(Fonts.fit(invite.substring(1), Kit.BODY_B, iw - 8), Kit.BODY_B, ix + 4, iy + 3.5f + Kit.lh(Kit.SUB) + 1, Kit.WHITE);
+            iy += inviteH + gap;
+        } else if (code) {
             c.fillRound(ix, iy, iw, inviteH, 4, Kit.a(0.07f, 0xFFFFFF), Kit.a(0.07f, 0xFFFFFF), 0.25f, Kit.a(0.1f, 0xFFFFFF));
             c.text("Код для друга — вставить в Blockyard → «Подключиться к другу»", Kit.SUB, ix + 4, iy + 3.5f, Kit.MUTED);
             float codeY = iy + 3.5f + Kit.lh(Kit.SUB) + 1;
